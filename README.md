@@ -1,412 +1,211 @@
-# YouTube Shorts Maker
+# 🎬 YouTube Shorts AI Generator
 
-AI-Powered Video Creation Tool with Professional GUI
+**AI-powered automated YouTube Shorts creation using Stable Diffusion, Ollama, and FFmpeg**
 
-Generate engaging YouTube Shorts automatically with AI-generated scripts, backgrounds, voice narration, and karaoke captions.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/)
+[![GPU Accelerated](https://img.shields.io/badge/GPU-CUDA-green.svg)](https://developer.nvidia.com/cuda-toolkit)
 
----
+## ✨ Features
 
-## Features
+- 🤖 **AI Script Writing** - Uses Ollama + Mistral to generate engaging YouTube Shorts scripts
+- 🎤 **Voice Synthesis** - High-quality voice narration using Edge TTS
+- 🎨 **AI Background Generation** - Stable Diffusion creates custom backgrounds (GPU accelerated)
+- 🎬 **Ken Burns Effects** - Smooth zoom/pan effects on AI-generated images
+- 🔄 **Pure FFmpeg Pipeline** - No MoviePy dependency - faster and more reliable
+- 🎛️ **Professional UI** - CustomTkinter-based YouTube Studio inspired interface
+- 📊 **Real-time Progress** - Console window shows detailed generation progress
+- 🚀 **GPU Optimization** - Memory management and CUDA acceleration
+- 📱 **YouTube Shorts Ready** - Optimized 9:16 vertical format
 
-- **AI Script Generation** - Ollama generates optimized scripts for YouTube Shorts
-- **AI Backgrounds** - Stable Diffusion creates custom vertical backgrounds (requires GPU)
-- **Voice Narration** - Free text-to-speech with gTTS
-- **Karaoke Captions** - Word-by-word highlighting captions
-- **YouTube Studio GUI** - Professional dark theme interface
-- **100% D Drive** - All components install to D drive
-- **YouTube Compliant** - AI disclosure, 9:16 format, proper specifications
+## 🚀 Quick Start
 
----
+### Prerequisites
+- **Python 3.11+**
+- **NVIDIA GPU** (for AI background generation)
+- **Ollama** (for AI script writing)
+- **FFmpeg** (for video processing)
 
-## System Requirements
+### Installation
 
-### Minimum (Stock Video Mode)
-- Windows 10/11
-- Python 3.9+
-- 4 GB RAM
-- 5 GB free space on D drive
-- Internet connection
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/Mahinika/youtube-shorts-ai-generator.git
+   cd youtube-shorts-ai-generator
+   ```
 
-### Recommended (AI Background Mode)
-- Windows 10/11
-- Python 3.9+
-- NVIDIA GPU with 6+ GB VRAM
-- 16 GB RAM
-- 20 GB free space on D drive
-- Internet connection
+2. **Install dependencies**
+   ```bash
+   pip install -r requirements.txt
+   ```
 
----
+3. **Install Ollama and download model**
+   ```bash
+   # Install Ollama from https://ollama.com
+   ollama pull mistral
+   ```
 
-## Quick Start
+4. **Run the application**
+   ```bash
+   python start_app.py
+   ```
 
-### 1. Run Setup Script
+## 🎯 How It Works
 
-Double-click: `D:\YouTubeShortsProject\setup_complete.bat`
+### The Pipeline
+1. **Script Generation** - Ollama AI creates engaging YouTube Shorts scripts
+2. **Voice Creation** - Edge TTS generates natural-sounding narration
+3. **Background Generation** - Stable Diffusion creates custom AI backgrounds
+4. **Video Effects** - FFmpeg applies Ken Burns effects to backgrounds
+5. **Composition** - FFmpeg combines everything into final video
 
-This creates the folder structure and sets environment variables.
-
-### 2. Install Dependencies
-
-Run: `D:\YouTubeShortsProject\start_project.bat`
-
-Then:
-```bash
-pip install -r requirements.txt
+### Architecture
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   AI Script     │ -> │   Voice TTS     │ -> │  AI Backgrounds │
+│   (Ollama)      │    │   (Edge TTS)    │    │  (Stable Diff)  │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+         │                       │                       │
+         └───────────────────────┼───────────────────────┘
+                                 │
+                    ┌─────────────────┐
+                    │   Ken Burns    │
+                    │   Effects      │
+                    │   (FFmpeg)     │
+                    └─────────────────┘
+                                 │
+                    ┌─────────────────┐
+                    │   Final Video  │
+                    │   Composition  │
+                    │   (FFmpeg)     │
+                    └─────────────────┘
 ```
 
-### 3. Install Ollama
+## 📋 Requirements
 
-Download from: https://ollama.com/download
+### System Requirements
+- **OS**: Windows 10/11, Linux, macOS
+- **RAM**: 16GB+ recommended
+- **GPU**: NVIDIA GPU with CUDA support (RTX series recommended)
+- **Storage**: 10GB+ free space
 
-Install and run:
-```bash
-ollama serve
+### Python Dependencies
+```
+torch>=2.0.0
+diffusers>=0.35.0
+transformers>=4.35.0
+accelerate>=1.10.0
+numpy>=1.24.0,<2.0.0
+customtkinter>=5.2.0
+ollama>=0.1.0
+pydub>=0.25.1
+pillow>=10.0.0
 ```
 
-In another terminal:
-```bash
-ollama pull llama3.2
-```
+### External Dependencies
+- **Ollama** - AI model server
+- **FFmpeg** - Video processing
+- **Edge TTS** - Voice synthesis (built-in)
 
-### 4. Get API Keys (Optional)
+## 🎮 Usage
 
-Only needed if you don't have a GPU for AI backgrounds:
+1. **Start the application**
+   ```bash
+   python start_app.py
+   ```
 
-- Pexels: https://www.pexels.com/api/ (FREE)
-- Pixabay: https://pixabay.com/api/docs/ (FREE)
+2. **Enter your video topic**
+   - Example: "Amazing space facts that will blow your mind"
 
-Copy `env.example` to `.env` and add your keys.
+3. **Click "Generate Video"**
+   - Watch the console window for real-time progress
+   - AI generates script → voice → backgrounds → video
 
-### 5. Run the App
+4. **Find your video**
+   - Videos saved in `finished_videos/` folder
+   - Ready to upload to YouTube Shorts!
 
-```bash
-python start_app.py
-```
+## 🔧 Configuration
 
----
-
-## Usage
-
-### Creating Your First Short
-
-1. Launch the app: `python start_app.py`
-2. Enter your video idea in the text box
-3. Select duration (15, 30, 45, or 60 seconds)
-4. Click "Generate Short"
-5. Wait 5-10 minutes for generation
-6. Find your video in `finished_videos/`
-
-### Example Prompts
-
-- "Amazing facts about the ocean"
-- "How to stay motivated"
-- "Top 5 space discoveries"
-- "Quick cooking tips"
-
----
-
-## File Structure
-
-```
-D:\YouTubeShortsProject\
-├── NCWM\                       # Project code
-│   ├── start_app.py           # Main launcher
-│   ├── requirements.txt       # Python dependencies
-│   ├── env.example            # Environment template
-│   ├── .env                   # Your API keys (create this)
-│   ├── CODING_RULES.md        # Development guidelines
-│   │
-│   ├── settings\              # Configuration
-│   │   └── config.py          # All settings
-│   │
-│   ├── steps\                 # Video generation pipeline
-│   │   ├── step1_write_script.py
-│   │   ├── step2_create_voice.py
-│   │   ├── step3_generate_backgrounds.py
-│   │   ├── step4_add_captions.py
-│   │   └── step5_combine_everything.py
-│   │
-│   ├── helpers\               # Utilities
-│   │   └── cleanup_temp_files.py
-│   │
-│   ├── ui\                    # User interface
-│   │   └── youtube_studio_interface.py
-│   │
-│   ├── finished_videos\       # Your videos appear here
-│   ├── temp_files\            # Temporary processing files
-│   └── metadata\              # Video metadata (titles, descriptions)
-│
-├── python_env\                # Python virtual environment
-├── models\                    # AI models (Ollama + Stable Diffusion)
-├── cache\                     # Download cache
-└── temp\                      # Temporary files
-```
-
----
-
-## How It Works
-
-### Step 1: AI Script Writing
-- Connects to local Ollama instance
-- Generates topic, title, description, script
-- Optimized for YouTube Shorts (hook in 3 seconds)
-- Creates scene descriptions for visuals
-
-### Step 2: Voice Generation
-- Converts script to speech with gTTS
-- Calculates exact duration
-- Saves to temp folder on D drive
-
-### Step 3: AI Background Generation
-- If GPU available: Uses Stable Diffusion
-  - Generates 1080x1920 vertical images
-  - Applies Ken Burns zoom effects
-  - Creates dynamic video clips
-- If no GPU: Uses fallback colored backgrounds
-
-### Step 4: Karaoke Captions
-- Creates word-by-word timestamps
-- Large text (80px) for mobile viewing
-- Yellow text with black outline
-- Centers on screen for vertical format
-
-### Step 5: Final Composition
-- Combines all elements
-- Resizes/crops to 1080x1920
-- Adds audio narration
-- Composites caption layers
-- Adds AI disclosure watermark
-- Renders H.264 MP4
-
----
-
-## YouTube Upload Guide
-
-### Before Uploading
-
-1. Find your video in `finished_videos/`
-2. Find metadata in `metadata/` (same name as video)
-3. Copy title and description from metadata JSON
-
-### Upload Checklist
-
-- [ ] Check "Altered content" box on YouTube
-- [ ] Select "I used AI to generate content"
-- [ ] Use title from metadata file
-- [ ] Use description from metadata file (includes AI disclosure)
-- [ ] Add #Shorts hashtag (already in description)
-- [ ] Set as "Not made for kids"
-- [ ] Choose appropriate category
-
-### YouTube Shorts Requirements
-
-Your videos are already compliant:
-- 9:16 aspect ratio
-- 1080x1920 resolution
-- Under 60 seconds
-- AI disclosure included
-- Proper format (MP4, H.264)
-
----
-
-## Troubleshooting
-
-### "Cannot connect to Ollama"
-**Solution**: Start Ollama in another terminal
-```bash
-ollama serve
-```
-
-### "No GPU detected"
-**Solution**: Either:
-1. Get API keys for stock videos (Pexels/Pixabay)
-2. Use Google Colab for free GPU access
-3. Accept fallback colored backgrounds
-
-### "Missing packages"
-**Solution**: Install dependencies
-```bash
-pip install -r requirements.txt
-```
-
-### "Video generation failed"
-**Check**:
-1. Ollama is running
-2. All packages installed
-3. Enough disk space (5+ GB free)
-4. Internet connection active
-
-### "Out of memory"
-**Solution**: 
-- Close other programs
-- Reduce video duration to 30 seconds
-- Use stock videos instead of AI backgrounds
-
----
-
-## Configuration
-
-Edit `settings/config.py` to customize:
-
-- Video resolution and FPS
-- Caption styling (size, color, position)
-- AI model selection
-- Stable Diffusion parameters
-- Output folders
-
----
-
-## Storage Requirements
-
-### With Stock Videos (No GPU)
-- Python packages: ~800 MB
-- Ollama + llama3.2: ~2.5 GB
-- Per video: ~100 MB
-- **Total: ~4 GB**
-
-### With AI Backgrounds (GPU)
-- Python packages: ~800 MB
-- Ollama + llama3.2: ~2.5 GB
-- Stable Diffusion model: ~5 GB
-- PyTorch: ~2 GB
-- Per video: ~100 MB
-- **Total: ~13 GB**
-
-### C Drive Usage
-Only ~200 MB (Ollama program only)
-
----
-
-## Performance
-
-### Generation Time
-- Stock videos: 4-7 minutes per Short
-- AI backgrounds: 5-11 minutes per Short (with GPU)
-
-### Bottlenecks
-- Script generation: 10-30 seconds
-- Voice generation: 5-10 seconds
-- AI backgrounds: 2-5 minutes (GPU) or instant (fallback)
-- Video rendering: 2-5 minutes
-
----
-
-## Advanced Usage
-
-### Command Line Mode
-
+### GPU Settings
 ```python
-from steps import *
-
-# Generate script
-script = write_script_with_ollama("Amazing facts about space")
-
-# Create voice
-voice = create_voice_narration(script["script"])
-
-# Generate backgrounds
-backgrounds = generate_ai_backgrounds(script["scene_descriptions"])
-clips = images_to_video_clips(backgrounds)
-
-# Add captions
-timestamps = generate_word_timestamps(script["script"], voice["duration"])
-captions = create_shorts_captions(timestamps)
-
-# Combine
-final = combine_into_final_video(clips, voice["path"], voice["duration"], captions, "my_video")
+# In settings/config.py
+SD_DEVICE = "cuda"  # Use GPU for AI generation
+SD_ATTENTION_SLICING = True  # Memory optimization
 ```
 
-### Batch Processing
-
-Create multiple videos from a list of prompts:
-
+### Video Settings
 ```python
-prompts = [
-    "Amazing ocean facts",
-    "Quick cooking tips",
-    "Space discoveries"
-]
-
-for prompt in prompts:
-    # Generate each video
-    pass
+VIDEO_WIDTH = 1080
+VIDEO_HEIGHT = 1920  # 9:16 aspect ratio
+VIDEO_FPS = 24
 ```
 
----
-
-## Development
-
-### Adding Features
-
-1. Follow CODING_RULES.md
-2. No emojis in code
-3. Use beginner-friendly names
-4. All paths on D drive
-5. Test thoroughly
-
-### Contributing
-
-1. Create a feature branch
-2. Follow coding rules
-3. Test on D drive setup
-4. Submit pull request
-
----
-
-## License
-
-This project is for educational purposes.
-
-**Third-party components**:
-- Ollama: Apache 2.0
-- Stable Diffusion: CreativeML Open RAIL-M
-- MoviePy: MIT
-- Pexels/Pixabay: Free with attribution
-
----
-
-## Support
-
-### Issues
-
-Common issues and solutions are in the Troubleshooting section above.
-
-### Verification
-
-Run the verification script to check your setup:
-```bash
-python ..\verify_setup.py
+### AI Models
+```python
+OLLAMA_MODEL = "mistral"  # Script writing
+SD_MODEL = "runwayml/stable-diffusion-v1-5"  # Backgrounds
 ```
 
+## 🚀 Optimization Features
+
+- **GPU Memory Management** - Prevents VRAM exhaustion
+- **Batch Processing** - Efficient background generation
+- **Automatic Cleanup** - Removes temporary files
+- **Error Recovery** - Fallback mechanisms for failed generations
+- **Progress Tracking** - Real-time console output
+
+## 🛠️ Development
+
+### Project Structure
+```
+youtube-shorts-ai-generator/
+├── steps/                 # Processing pipeline
+│   ├── step1_write_script.py
+│   ├── step2_create_voice.py
+│   ├── step3_generate_backgrounds.py
+│   ├── step4_add_captions.py
+│   └── step5_combine_everything.py
+├── ui/                    # User interface
+│   └── youtube_studio_interface.py
+├── helpers/               # Utility functions
+├── settings/              # Configuration
+├── finished_videos/       # Output directory
+├── temp_files/           # Temporary files
+└── requirements.txt
+```
+
+### Adding New Features
+1. Create new step in `steps/` directory
+2. Update `ui/youtube_studio_interface.py` to call new step
+3. Add configuration in `settings/config.py`
+4. Update `requirements.txt` if needed
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- **Stable Diffusion** - For AI image generation
+- **Ollama** - For local AI model hosting
+- **FFmpeg** - For video processing
+- **Edge TTS** - For voice synthesis
+- **YouTube** - For Shorts format inspiration
+
+## 📞 Support
+
+- **Issues**: [GitHub Issues](https://github.com/Mahinika/youtube-shorts-ai-generator/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/Mahinika/youtube-shorts-ai-generator/discussions)
+
 ---
 
-## Credits
-
-**AI Models**:
-- Ollama (llama3.2)
-- Stable Diffusion v1.5
-- Google TTS
-
-**APIs**:
-- Pexels (stock videos)
-- Pixabay (stock videos)
-
-**Libraries**:
-- MoviePy (video editing)
-- CustomTkinter (GUI)
-- PyTorch (AI framework)
-- Diffusers (Stable Diffusion)
-
----
-
-## Version
-
-**Version**: 1.0.0
-**Release Date**: 2025
-**Python**: 3.9+
-**Platform**: Windows (D drive optimized)
-
----
-
-**Happy creating! Generate amazing YouTube Shorts with AI!**
-
+**Made with ❤️ for content creators who want to automate their YouTube Shorts workflow**
