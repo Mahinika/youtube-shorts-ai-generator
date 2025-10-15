@@ -22,24 +22,26 @@ def download_model():
     print("=" * 70)
     print()
     
-    print("This will download the Stable Diffusion model (~5GB) to your cache.")
-    print("After this, video generation will be much faster!")
+    print("This will download the SDXL 1.0 model (~7GB) to your D drive.")
+    print("After this, video generation will be much faster with better quality!")
     print()
     
-    # Create models directory
+    # Create models directory on D drive
     models_dir = Path(Config.MODELS_DIR)
     models_dir.mkdir(parents=True, exist_ok=True)
     print(f"Models directory: {models_dir}")
+    print(f"Storage location: D drive (as configured)")
     print()
     
     try:
-        from diffusers import StableDiffusionPipeline
+        from diffusers import DiffusionPipeline
         from huggingface_hub import hf_hub_download
         import torch
         
         model_name = Config.STABLE_DIFFUSION_MODEL
-        print(f"Downloading model: {model_name}")
-        print("This may take 10-15 minutes depending on your internet speed...")
+        print(f"Downloading SDXL model: {model_name}")
+        print("This may take 15-20 minutes depending on your internet speed...")
+        print("SDXL is larger than SD 1.5 but provides much better quality!")
         print()
         
         # Check if we have GPU
@@ -54,16 +56,17 @@ def download_model():
         print("Starting download...")
         print("=" * 50)
         
-        # Download the pipeline (this downloads all components)
-        pipe = StableDiffusionPipeline.from_pretrained(
+        # Download the SDXL pipeline (this downloads all components)
+        pipe = DiffusionPipeline.from_pretrained(
             model_name,
             torch_dtype=torch.float16 if device == "cuda" else torch.float32,
             use_safetensors=True,
-            cache_dir=str(models_dir)
+            cache_dir=str(models_dir),
+            variant="fp16" if device == "cuda" else None
         )
         
         print("=" * 50)
-        print("✅ Download completed successfully!")
+        print("Download completed successfully!")
         print()
         
         # Test the pipeline
@@ -74,22 +77,22 @@ def download_model():
         if device == "cuda":
             pipe.enable_attention_slicing()
             pipe.enable_vae_slicing()
-            print("✅ Memory optimizations enabled")
+            print("Memory optimizations enabled")
         
-        # Quick test generation
-        print("Running test generation...")
-        test_prompt = "a simple red circle on white background"
+        # Quick test generation with SDXL
+        print("Running SDXL test generation...")
+        test_prompt = "a simple red circle on white background, high quality"
         
         with torch.no_grad():
             test_image = pipe(
                 test_prompt,
-                height=512,
-                width=512,
-                num_inference_steps=8,  # Quick test
-                guidance_scale=7.5
+                height=1024,
+                width=1024,
+                num_inference_steps=15,  # SDXL optimized test
+                guidance_scale=7.0
             ).images[0]
         
-        print("✅ Test generation successful!")
+        print("Test generation successful!")
         
         # Cleanup
         del pipe
@@ -99,7 +102,7 @@ def download_model():
         
         print()
         print("=" * 70)
-        print("🎉 MODEL DOWNLOAD COMPLETE!")
+        print("MODEL DOWNLOAD COMPLETE!")
         print("=" * 70)
         print()
         print("What happens next:")
@@ -112,12 +115,12 @@ def download_model():
         print("The model will load instantly from cache!")
         
     except ImportError as e:
-        print(f"❌ Missing required package: {e}")
+        print(f"Missing required package: {e}")
         print("Please install: pip install diffusers transformers torch")
         return False
         
     except Exception as e:
-        print(f"❌ Download failed: {e}")
+        print(f"Download failed: {e}")
         print()
         print("Common solutions:")
         print("1. Check your internet connection")

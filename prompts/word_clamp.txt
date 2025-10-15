@@ -1,0 +1,4 @@
+Rewrite the script to ~{target_words} words while preserving beats and CTA. Return the same JSON keys.
+
+SCRIPT JSON:
+{script_json}

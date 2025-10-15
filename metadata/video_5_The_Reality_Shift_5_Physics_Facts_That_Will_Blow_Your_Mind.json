@@ -1,0 +1,54 @@
+{
+  "topic": "Mind-bending physics facts that will change how you see reality",
+  "title": "The Reality Shift: 5 Physics Facts That Will Blow Your Mind",
+  "description": "Get ready for a journey through the fascinating realm of physics.",
+  "script": {
+    "beat1": [
+      "Imagine you're on a train, heading to your destination.",
+      "But suddenly, it screeches to a halt.",
+      "You're 300 meters away from where you were just minutes ago."
+    ],
+    "beat2": [
+      "What's happening? Is time lost or something more?",
+      "Let's explore the strange world of quantum entanglement."
+    ],
+    "beat3": [
+      "Classical mechanics vs. quantum mechanics: which reality is 'real'?"
+    ],
+    "beat4": [
+      "A comparison that will leave you questioning everything."
+    ],
+    "beat5": [
+      "So, which reality is real? Is it our everyday lives?"
+    ]
+  },
+  "search_keywords": [
+    "physics",
+    "mind-bending facts",
+    "reality",
+    "time dilation",
+    "quantum entanglement"
+  ],
+  "scene_descriptions": [
+    {
+      "beat": "1",
+      "visual": "A person standing on a train track, looking confused."
+    },
+    {
+      "beat": "2",
+      "visual": "The train's clock stopped at an odd time."
+    },
+    {
+      "beat": "3",
+      "visual": "An animation of entangled particles."
+    },
+    {
+      "beat": "4",
+      "visual": "A split-screen comparison of classical and quantum mechanics."
+    },
+    {
+      "beat": "5",
+      "visual": "You're back on the train track, looking relieved but still puzzled."
+    }
+  ]
+}

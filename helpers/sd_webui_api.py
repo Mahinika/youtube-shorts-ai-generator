@@ -92,6 +92,36 @@ class SDWebUIAPI:
             "batch_size": 1,
         }
         
+        # Add tiling parameters if enabled
+        try:
+            from settings.config import Config
+            if hasattr(Config, 'SD_ENABLE_TILED_DIFFUSION') and Config.SD_ENABLE_TILED_DIFFUSION:
+                payload['alwayson_scripts'] = {
+                    "Tiled Diffusion": {
+                        "args": [
+                            True,  # Enable
+                            "MultiDiffusion",  # Method
+                            Config.SD_TILE_WIDTH,
+                            Config.SD_TILE_HEIGHT,
+                            Config.SD_TILE_OVERLAP,
+                            1,  # Upscaler index
+                        ]
+                    },
+                    "Tiled VAE": {
+                        "args": [
+                            True,  # Enable
+                            2048,  # Encoder tile size
+                            2048,  # Decoder tile size
+                            True,  # Fast encoder
+                            True,  # Fast decoder
+                            True,  # Color fix
+                        ]
+                    }
+                }
+        except ImportError:
+            # Config not available, skip tiling
+            pass
+        
         try:
             print(f"  Generating via WebUI API ({width}x{height}, {steps} steps)...")
             start_time = time.time()

@@ -1,0 +1,29 @@
+{
+  "topic": "Space Exploration",
+  "title": "Mind-blowing Facts About Space That Will Shock You",
+  "description": "Embark on a journey through the unknown and discover hidden truths about space exploration.",
+  "script": [
+    "[0:00] Darkness. Stars twinkle like diamonds in the sky. [0:05] A spaceship bursts into view, headed towards Saturn's rings.",
+    "[1:15] Encounter Enceladus, home to a subsurface ocean and potential candidate for life.",
+    "[2:30] But what lies at the heart of Saturn? A massive black hole awaits.",
+    "[3:10] The event horizon is just 12 kilometers wide – smaller than Paris. [3:20] You're being pulled towards the void.",
+    "[4:00] Gravity is so strong, not even light can escape. Yet, you're still here, watching in awe.",
+    "[5:30] Space exploration has shown us our universe is vast and mysterious.",
+    "[6:45] But there's one more thing... [7:00] You're not alone. Billions of galaxies out there, each with its own mysteries waiting to be solved.",
+    "[8:10] The search for answers continues. Get ready to explore the unknown."
+  ],
+  "search_keywords": [
+    "Space Exploration",
+    "Saturn",
+    "Black Holes",
+    "Galaxies",
+    "Universe"
+  ],
+  "scene_descriptions": [
+    "A spaceship enters Saturn's orbit, with the rings stretching out before it.",
+    "A close-up of Enceladus' icy surface, showing a subsurface ocean.",
+    "An artist's impression of a massive black hole at the heart of Saturn.",
+    "The event horizon of the black hole, with the city of Paris for scale.",
+    "A spaceship being pulled towards the event horizon, with an astronaut watching in awe."
+  ]
+}

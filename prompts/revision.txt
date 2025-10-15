@@ -1,0 +1,4 @@
+Revise this script JSON to improve hook specificity, visual cues, and pacing. Keep keys the same. Ensure 85–130 words overall and beats (if present) total ~34–52s.
+
+SCRIPT JSON:
+{script_json}

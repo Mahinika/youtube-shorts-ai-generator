@@ -1,0 +1,35 @@
+{
+  "topic": "Space Exploration",
+  "title": "Mind-Blowing Facts About Space",
+  "description": "Join us on an epic journey through the unknown.\n\nThis YouTube Short was created using AI-generated content including script and voice narration.\n\n#AIGenerated #YouTubeShorts",
+  "script": "Get ready to explore! We're counting down the top secrets of space exploration.\n\n[INTRO MUSIC FADES OUT]\n\n1. The Universe is 93 Billion Light Years Across.\nImagine a cosmic canvas stretching across the fabric of space-time.",
+  "search_keywords": [
+    "space exploration",
+    "black holes",
+    "Mars",
+    "universe facts",
+    "astronomy"
+  ],
+  "scene_descriptions": [
+    "[INTRO MUSIC FADES OUT, COSMIC BACKGROUND APPEARS WITH A STRETCHING GALAXY]",
+    "[ANIMATION OF A GALAXY EXPANDING APPEARS ON-SCREEN WITH COUNTDOWN TEXT '93 BILLION LIGHT YEARS']"
+  ],
+  "beats": [
+    {
+      "text": "The Universe is 93 Billion Light Years Across.",
+      "duration_seconds": 8,
+      "image_prompt": "cosmic blue background",
+      "negative_prompt": "blurry footage",
+      "captions": [
+        "Billions of Light-Years"
+      ]
+    },
+    {
+      "text": "Mind-Blown? Let's Explore!",
+      "duration_seconds": 4,
+      "image_prompt": "energetic space visuals",
+      "negative_prompt": "slow footage",
+      "captions": []
+    }
+  ]
+}

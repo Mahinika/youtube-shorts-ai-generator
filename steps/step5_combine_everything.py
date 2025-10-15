@@ -21,7 +21,7 @@ def combine_into_final_video(
     video_clips: list,
     audio_path: str,
     audio_duration: float,
-    caption_clips: list,
+    caption_ass_path: str,
     output_name: str,
 ) -> str:
     """
@@ -70,7 +70,7 @@ def combine_into_final_video(
 
     # Build FFmpeg command
     ffmpeg_cmd = _build_ffmpeg_command(
-        video_clips, audio_path, audio_duration, output_name, str(output_path)
+        video_clips, audio_path, audio_duration, output_name, str(output_path), caption_ass_path
     )
 
     # Execute FFmpeg with real-time output
@@ -93,7 +93,7 @@ def combine_into_final_video(
         raise
 
 
-def _build_ffmpeg_command(video_clips, audio_path, audio_duration, output_name, output_path):
+def _build_ffmpeg_command(video_clips, audio_path, audio_duration, output_name, output_path, caption_ass_path: str = ""):
     """Build the complete FFmpeg command for video composition."""
     
     input_args = []
@@ -159,26 +159,15 @@ def _build_ffmpeg_command(video_clips, audio_path, audio_duration, output_name, 
             f"[0:v]setsar=1[vc]"
         )
     
-    # Add captions if available
+    # Add ASS subtitles via libass if provided
     current_filter = "vc"
-    try:
-        captions = _generate_captions(output_name, audio_duration)
-        if captions:
-            print(f"  Adding {len(captions)} caption phrases...")
-            for i, caption in enumerate(captions):
-                next_filter = f"vc{i+1}" if i < len(captions)-1 else "vc_final"
-                filter_complex_parts.append(
-                    f"[{current_filter}]drawtext=text='{caption['text']}':"
-                    f"fontcolor={Config.CAPTION_FONT_COLOR}:"
-                    f"fontsize={Config.CAPTION_FONT_SIZE}:"
-                    f"borderw={Config.CAPTION_STROKE_WIDTH}:"
-                    f"bordercolor={Config.CAPTION_STROKE_COLOR}:"
-                    f"x=(w-tw)/2:y=(h/2):"
-                    f"enable='between(t,{caption['start']:.2f},{caption['end']:.2f})'[{next_filter}]"
-                )
-                current_filter = next_filter
-    except Exception as e:
-        print(f"  Caption error: {e}")
+    if caption_ass_path:
+        fonts_dir = Path("fonts")
+        ass_norm = str(Path(caption_ass_path)).replace("\\", "/")
+        fonts_norm = str(fonts_dir).replace("\\", "/")
+        subtitles_arg = f"subtitles={ass_norm}:fontsdir={fonts_norm}"
+        filter_complex_parts.append(f"[{current_filter}]{subtitles_arg}[vc_final]")
+        current_filter = "vc_final"
     
     # Add watermark
     wm_text = Config.WATERMARK_TEXT.replace(":", "\\:").replace("'", "\\'")
@@ -214,8 +203,11 @@ def _build_ffmpeg_command(video_clips, audio_path, audio_duration, output_name, 
         "-vcodec", Config.VIDEO_CODEC,
         "-acodec", Config.AUDIO_CODEC,
         "-b:a", Config.AUDIO_BITRATE,
-        "-preset", getattr(Config, "VIDEO_PRESET", "veryfast"),
-        "-crf", str(getattr(Config, "VIDEO_CRF", 23)),
+        "-preset", getattr(Config, "NVENC_PRESET", "p1"),
+        "-tune", getattr(Config, "NVENC_TUNE", "ull"),
+        "-rc", getattr(Config, "NVENC_RC", "cbr"),
+        "-b:v", getattr(Config, "NVENC_BITRATE", "3M"),
+        "-g", str(getattr(Config, "NVENC_GOP_SIZE", 30)),
         "-t", str(max(0.1, float(audio_duration))),
         "-threads", str(getattr(Config, "FFMPEG_THREADS", 0) or 0),
         str(output_path)
@@ -281,7 +273,12 @@ def create_ken_burns_effect(image_path: str, duration: float, output_path: str) 
         "-vf", f"scale=iw*1.1:ih*1.1,zoompan=z='if(lte(zoom,1.0),1.0,max(1.001,zoom-0.0015))':"
                f"d={int(duration * Config.VIDEO_FPS)}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':"
                f"s={Config.VIDEO_WIDTH}x{Config.VIDEO_HEIGHT}",
-        "-c:v", "libx264",
+        "-c:v", Config.VIDEO_CODEC,
+        "-preset", getattr(Config, "NVENC_PRESET", "p1"),
+        "-tune", getattr(Config, "NVENC_TUNE", "ull"),
+        "-rc", getattr(Config, "NVENC_RC", "cbr"),
+        "-b:v", getattr(Config, "NVENC_BITRATE", "3M"),
+        "-g", str(getattr(Config, "NVENC_GOP_SIZE", 30)),
         "-pix_fmt", "yuv420p",
         "-r", str(Config.VIDEO_FPS),
         str(output_path)
@@ -311,7 +308,12 @@ def _create_static_video(image_path: str, duration: float, output_path: str) -> 
         "-t", str(duration),
         "-vf", f"scale={Config.VIDEO_WIDTH}:{Config.VIDEO_HEIGHT}:force_original_aspect_ratio=decrease,"
                f"pad={Config.VIDEO_WIDTH}:{Config.VIDEO_HEIGHT}:(ow-iw)/2:(oh-ih)/2",
-        "-c:v", "libx264",
+        "-c:v", Config.VIDEO_CODEC,
+        "-preset", getattr(Config, "NVENC_PRESET", "p1"),
+        "-tune", getattr(Config, "NVENC_TUNE", "ull"),
+        "-rc", getattr(Config, "NVENC_RC", "cbr"),
+        "-b:v", getattr(Config, "NVENC_BITRATE", "3M"),
+        "-g", str(getattr(Config, "NVENC_GOP_SIZE", 30)),
         "-pix_fmt", "yuv420p",
         "-r", str(Config.VIDEO_FPS),
         str(output_path)

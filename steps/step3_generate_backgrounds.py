@@ -91,10 +91,11 @@ def generate_ai_backgrounds_webui(
             timeout=Config.SD_WEBUI_TIMEOUT
         )
         
-        # OPTIMIZATION: Reduce scene count from 5 to 3 for faster generation
-        optimized_scenes = scene_descriptions[:3]
-        if len(scene_descriptions) > 3:
-            print(f"OPTIMIZATION: Reduced from {len(scene_descriptions)} to 3 scenes for speed")
+        # OPTIMIZATION: Use configurable scene count for optimal performance
+        max_scenes = getattr(Config, 'SD_MAX_SCENES', 2)
+        optimized_scenes = scene_descriptions[:max_scenes]
+        if len(scene_descriptions) > max_scenes:
+            print(f"OPTIMIZATION: Reduced from {len(scene_descriptions)} to {max_scenes} scenes for speed")
         
         # Generate images
         image_paths = []
@@ -180,9 +181,9 @@ def generate_ai_backgrounds_diffusers(
 
     print(f"Using device: {device}")
 
-    # Import Stable Diffusion (only if GPU available)
+    # Import SDXL pipeline (only if GPU available)
     try:
-        from diffusers import StableDiffusionPipeline
+        from diffusers import DiffusionPipeline
     except ImportError:
         print("ERROR: diffusers package not installed")
         print("Install with: pip install diffusers transformers accelerate")
@@ -193,9 +194,9 @@ def generate_ai_backgrounds_diffusers(
     if len(scene_descriptions) > 3:
         print(f"OPTIMIZATION: Reduced from {len(scene_descriptions)} to 3 scenes for memory efficiency")
 
-    # Load Stable Diffusion model with context manager for cleanup
-    print(f"Loading Stable Diffusion model: {Config.STABLE_DIFFUSION_MODEL}")
-    print("This may take a few minutes on first run (downloading ~5GB model)...")
+    # Load SDXL model with context manager for cleanup
+    print(f"Loading SDXL model: {Config.STABLE_DIFFUSION_MODEL}")
+    print("This may take a few minutes on first run (downloading ~7GB SDXL model)...")
 
     pipe = None
     try:
@@ -206,11 +207,11 @@ def generate_ai_backgrounds_diffusers(
                 f"GPU Memory before loading: {torch.cuda.memory_allocated() / 1024**3:.1f} GB"
             )
 
-        pipe = StableDiffusionPipeline.from_pretrained(
+        pipe = DiffusionPipeline.from_pretrained(
             Config.STABLE_DIFFUSION_MODEL,
             torch_dtype=torch.float16,  # Use half precision to save memory
-            safety_checker=None,  # Disable for speed
-            requires_safety_checker=False,
+            use_safetensors=True,
+            variant="fp16" if device == "cuda" else None,
         ).to(device)
 
         # Enable memory optimizations for 6GB GPU
@@ -276,17 +277,17 @@ def generate_ai_backgrounds_diffusers(
                 inference_steps = Config.SD_INFERENCE_STEPS
                 print(f"    Using {inference_steps} inference steps (optimized)")
 
-                # OPTIMIZATION: Generate at lower resolution for speed (4x faster!)
-                gen_width = getattr(Config, 'SD_GENERATION_WIDTH', Config.VIDEO_WIDTH)
-                gen_height = getattr(Config, 'SD_GENERATION_HEIGHT', Config.VIDEO_HEIGHT)
+                # SDXL: Generate at optimized resolution for quality and speed
+                gen_width = getattr(Config, 'SD_GENERATION_WIDTH', 1024)
+                gen_height = getattr(Config, 'SD_GENERATION_HEIGHT', 1024)
                 
                 if gen_width != Config.VIDEO_WIDTH or gen_height != Config.VIDEO_HEIGHT:
-                    print(f"    Generating at {gen_width}x{gen_height}, will upscale to {Config.VIDEO_WIDTH}x{Config.VIDEO_HEIGHT}")
+                    print(f"    SDXL generating at {gen_width}x{gen_height}, will resize to {Config.VIDEO_WIDTH}x{Config.VIDEO_HEIGHT}")
 
-                # OPTIMIZATION: Use even fewer steps to prevent stuck state
-                if inference_steps > 8:
-                    inference_steps = 8  # Maximum 8 steps to prevent stuck
-                    print(f"    Reduced to {inference_steps} steps for stability")
+                # SDXL: Use optimized step count (minimum 10 for quality)
+                if inference_steps < 10:
+                    inference_steps = 10  # SDXL minimum for quality
+                    print(f"    SDXL minimum steps set to {inference_steps} for quality")
                 
                 # Generate image with optimized settings
                 print(f"    Starting generation (this should take ~10-15 seconds)...")
@@ -346,14 +347,15 @@ def generate_ai_backgrounds_diffusers(
         return image_paths
 
     except Exception as e:
-        print(f"ERROR loading Stable Diffusion: {e}")
-        print("Model will be downloaded from Hugging Face on first run")
+        print(f"ERROR loading SDXL: {e}")
+        print("SDXL model will be downloaded from Hugging Face on first run")
+        print("This is a larger download (~7GB) but provides much better quality")
         return []
 
     finally:
-        # OPTIMIZATION: Explicit model cleanup and memory release
+        # OPTIMIZATION: Explicit SDXL model cleanup and memory release
         if pipe is not None:
-            print("Cleaning up Stable Diffusion pipeline...")
+            print("Cleaning up SDXL pipeline...")
             try:
                 # Move pipeline off GPU
                 if device == "cuda":
@@ -428,16 +430,17 @@ def images_to_video_clips(image_paths: list, duration_per_image: float = 3.0):
             # Output video path
             video_path = temp_dir / f"ken_burns_clip_{i}.mp4"
             
-            # FFmpeg command for Ken Burns effect (subtle zoom in)
+            # FFmpeg command for Ken Burns effect (stronger zoom & gentle pan)
             cmd = [
                 "ffmpeg", "-y",
                 "-loop", "1",
                 "-t", str(duration_per_image),
                 "-i", str(img_path),
-                "-vf", f"scale=iw*1.05:ih*1.05,"
-                      f"zoompan=z='if(lte(zoom,1.0),1.0,max(1.001,zoom-0.0015))':"
+                "-vf", f"scale=iw*1.12:ih*1.12,"
+                      f"zoompan=z='min(zoom+0.0025,1.12)':"
                       f"d={int(duration_per_image * Config.VIDEO_FPS)}:"
-                      f"x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':"
+                      f"x='iw/2-(iw/zoom/2)':"
+                      f"y='ih/2-(ih/zoom/2)':"
                       f"s={Config.VIDEO_WIDTH}x{Config.VIDEO_HEIGHT}",
                 "-c:v", "libx264",
                 "-pix_fmt", "yuv420p",
@@ -480,9 +483,9 @@ def _create_static_video_fallback(img_path: str, duration: float, temp_dir: Path
     
     cmd = [
         "ffmpeg", "-y",
-        "-f", "lavfi",
+        "-loop", "1",
+        "-i", str(img_path),
         "-t", str(duration),
-        "-i", f"movie={str(img_path)}:loop=0,setpts=N/(FRAME_RATE*TB)",
         "-vf", f"scale={Config.VIDEO_WIDTH}:{Config.VIDEO_HEIGHT}:force_original_aspect_ratio=decrease,"
                f"pad={Config.VIDEO_WIDTH}:{Config.VIDEO_HEIGHT}:(ow-iw)/2:(oh-ih)/2",
         "-c:v", "libx264",

@@ -44,13 +44,18 @@ class Config:
     MAX_DURATION_SECONDS = 60
     DEFAULT_DURATION_SECONDS = 45
 
-    # Video encoding (HIGH QUALITY)
-    VIDEO_CODEC = "libx264"
+    # Video encoding (HIGH QUALITY - GPU ACCELERATED)
+    VIDEO_CODEC = "h264_nvenc"  # GPU-accelerated encoding
     AUDIO_CODEC = "aac"
     VIDEO_CRF = 18  # Lower CRF = higher quality
-    VIDEO_PRESET = "medium"  # Better compression
+    VIDEO_PRESET = "slow"  # Best quality GPU preset
     AUDIO_BITRATE = "192k"  # High quality audio
     FFMPEG_THREADS = 0
+    
+    # GPU Encoding Settings
+    USE_GPU_ENCODING = True
+    GPU_ENCODER_PRESET = "slow"  # Best quality
+    FALLBACK_TO_CPU = True
 
     # Quality presets
     QUALITY_PRESETS = {
@@ -69,14 +74,18 @@ class Config:
     OLLAMA_HOST = "http://localhost:11434"
     OLLAMA_MODELS_PATH = BASE_PATH / "models"
 
-    # Stable Diffusion - HIGH QUALITY MODE
-    STABLE_DIFFUSION_MODEL = "runwayml/stable-diffusion-v1-5"
-    SD_INFERENCE_STEPS = 25  # More steps = better quality
+    # Stable Diffusion - SDXL HIGH QUALITY MODE
+    STABLE_DIFFUSION_MODEL = "stabilityai/stable-diffusion-xl-base-1.0"
+    SD_INFERENCE_STEPS = 30  # SDXL high quality: More steps for best results
     SD_GUIDANCE_SCALE = 7.5
     SD_DEVICE = "cuda"
     SD_LOW_MEMORY_MODE = True  # Still optimize memory
     SD_ATTENTION_SLICING = True
     SD_CPU_OFFLOAD = False
+    
+    # SDXL High Quality Resolution
+    SD_GENERATION_WIDTH = 1024   # SDXL native resolution for best quality
+    SD_GENERATION_HEIGHT = 1024  # Will be cropped/resized to 1080x1920
 
     # Video API Keys (fallback)
     PEXELS_API_KEY = os.getenv("PEXELS_API_KEY")
