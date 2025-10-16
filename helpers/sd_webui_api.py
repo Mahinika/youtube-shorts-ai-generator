@@ -10,7 +10,7 @@ import io
 import json
 import time
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 
 import requests
 from PIL import Image
@@ -56,6 +56,7 @@ class SDWebUIAPI:
         cfg_scale: float = 7.5,
         sampler: str = "DPM++ 2M Karras",
         seed: int = -1,
+        controlnet_units: Optional[List[Dict[str, Any]]] = None,
     ) -> Optional[Image.Image]:
         """
         Generate a single image using the WebUI API
@@ -69,6 +70,7 @@ class SDWebUIAPI:
             cfg_scale: Guidance scale (7-12 recommended)
             sampler: Sampling method (see WebUI for options)
             seed: Random seed (-1 for random)
+            controlnet_units: List of ControlNet units for guidance
         
         Returns:
             PIL Image or None if generation failed
@@ -91,6 +93,15 @@ class SDWebUIAPI:
             "n_iter": 1,
             "batch_size": 1,
         }
+        
+        # Add ControlNet support if units provided
+        if controlnet_units and len(controlnet_units) > 0:
+            payload["alwayson_scripts"] = {
+                "ControlNet": {
+                    "args": controlnet_units
+                }
+            }
+            print(f"  🎯 Using ControlNet with {len(controlnet_units)} control units")
         
         # Add tiling parameters if enabled
         try:

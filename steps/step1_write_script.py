@@ -22,10 +22,14 @@ from utils import (
     extract_json_from_response,
     validate_json_structure,
     prompt_manager,
-    logger,
     monitor_performance,
     performance_tracker
 )
+from utils.logging_utils import get_logger, log_step, log_ai_generation, get_structured_logger
+
+# Initialize loggers
+logger = get_logger("script_generation")
+structured_logger = get_structured_logger("script_generation")
 from utils.ai_providers import generate_with_ai
 
 
@@ -34,6 +38,8 @@ def get_topic_specific_context(topic: str) -> str:
     return prompt_manager.get_topic_context(topic)
 
 
+@log_step("script_generation", "Generate YouTube Shorts script using AI")
+@log_ai_generation(Config.AI_PROVIDER, getattr(Config, f"{Config.AI_PROVIDER.upper()}_MODEL", ""))
 @monitor_performance
 def write_script_with_ollama(user_prompt: str) -> dict:
     """
@@ -45,7 +51,8 @@ def write_script_with_ollama(user_prompt: str) -> dict:
     Returns:
         Dictionary with: topic, title, description, script, search_keywords, scene_descriptions
     """
-    logger.info(f"Starting script generation for prompt: {user_prompt[:100]}...")
+    structured_logger.set_context(prompt=user_prompt[:100], provider=Config.AI_PROVIDER)
+    structured_logger.info("Starting script generation")
     performance_tracker.start_operation("script_generation")
 
     system_instructions = prompt_manager.get_prompt("script_gen")
@@ -60,7 +67,7 @@ Create a YouTube Short based on: "{user_prompt}"
 Return ONLY valid JSON."""
 
     try:
-        logger.info(f"Asking AI ({Config.AI_PROVIDER}) to write the script...")
+        structured_logger.info("Requesting AI script generation")
 
         # Use the unified AI provider with automatic fallback
         generated_text = generate_with_ai(system_instructions, user_message, logger)

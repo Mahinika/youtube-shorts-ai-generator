@@ -25,7 +25,7 @@ def combine_into_final_video(
     output_name: str,
 ) -> str:
     """
-    Combine all elements into final YouTube Short using pure FFmpeg.
+    Combine all elements into final YouTube Short using optimized video utilities.
 
     Specifications:
     - Resolution: 1080x1920 (9:16 vertical)
@@ -36,14 +36,15 @@ def combine_into_final_video(
         video_clips: List of image paths or video clips
         audio_path: Path to audio narration
         audio_duration: Duration in seconds
-        caption_clips: List of caption data (currently unused - captions via FFmpeg)
+        caption_ass_path: Path to ASS subtitle file
         output_name: Output filename (without extension)
 
     Returns:
         Path to final video file
     """
+    from utils.video_utils import combine_video_with_audio
 
-    print("Combining into final YouTube Short using pure FFmpeg...")
+    print("Combining into final YouTube Short using optimized video utilities...")
 
     # Ensure duration does not exceed 60 seconds
     if audio_duration > Config.MAX_DURATION_SECONDS:
@@ -68,28 +69,24 @@ def combine_into_final_video(
 
     print(f"  Output: {output_path}")
 
-    # Build FFmpeg command
-    ffmpeg_cmd = _build_ffmpeg_command(
-        video_clips, audio_path, audio_duration, output_name, str(output_path), caption_ass_path
-    )
-
-    # Execute FFmpeg with real-time output
-    print("  Running FFmpeg composition...")
-    print("  FFmpeg command:", " ".join(ffmpeg_cmd))
     try:
-        result = subprocess.run(ffmpeg_cmd, text=True)
-        if result.returncode != 0:
-            print(f"FFmpeg failed with return code: {result.returncode}")
-            raise RuntimeError(f"FFmpeg failed with return code: {result.returncode}")
+        # Use optimized video combination
+        result_path = combine_video_with_audio(
+            video_clips=video_clips,
+            audio_path=audio_path,
+            audio_duration=audio_duration,
+            output_path=str(output_path),
+            caption_ass_path=caption_ass_path
+        )
         
-        print(f"\nVideo saved: {output_path}")
+        print(f"\nVideo saved: {result_path}")
         print(f"Duration: {audio_duration:.1f} seconds")
         print(f"Resolution: {Config.VIDEO_WIDTH}x{Config.VIDEO_HEIGHT} (9:16)")
         
-        return str(output_path)
+        return result_path
         
     except Exception as e:
-        print(f"Error during FFmpeg execution: {e}")
+        print(f"Error during video combination: {e}")
         raise
 
 
@@ -206,7 +203,8 @@ def _build_ffmpeg_command(video_clips, audio_path, audio_duration, output_name, 
         "-preset", getattr(Config, "NVENC_PRESET", "p1"),
         "-tune", getattr(Config, "NVENC_TUNE", "ull"),
         "-rc", getattr(Config, "NVENC_RC", "cbr"),
-        "-b:v", getattr(Config, "NVENC_BITRATE", "3M"),
+        "-b:v", getattr(Config, "NVENC_BITRATE", "5M"),
+        "-maxrate", getattr(Config, "NVENC_MAX_BITRATE", "8M"),
         "-g", str(getattr(Config, "NVENC_GOP_SIZE", 30)),
         "-t", str(max(0.1, float(audio_duration))),
         "-threads", str(getattr(Config, "FFMPEG_THREADS", 0) or 0),
@@ -256,73 +254,24 @@ def _generate_captions(output_name, audio_duration):
 
 
 def create_ken_burns_effect(image_path: str, duration: float, output_path: str) -> str:
-    """Create Ken Burns effect using FFmpeg zoom and pan."""
-    
-    # Ken Burns parameters
-    zoom_start = 1.0
-    zoom_end = 1.05  # 5% zoom in
-    pan_x = 0.0      # No horizontal pan
-    pan_y = 0.0      # No vertical pan
-    
-    # FFmpeg command for Ken Burns effect
-    cmd = [
-        "ffmpeg", "-y",
-        "-loop", "1",
-        "-i", str(image_path),
-        "-t", str(duration),
-        "-vf", f"scale=iw*1.1:ih*1.1,zoompan=z='if(lte(zoom,1.0),1.0,max(1.001,zoom-0.0015))':"
-               f"d={int(duration * Config.VIDEO_FPS)}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':"
-               f"s={Config.VIDEO_WIDTH}x{Config.VIDEO_HEIGHT}",
-        "-c:v", Config.VIDEO_CODEC,
-        "-preset", getattr(Config, "NVENC_PRESET", "p1"),
-        "-tune", getattr(Config, "NVENC_TUNE", "ull"),
-        "-rc", getattr(Config, "NVENC_RC", "cbr"),
-        "-b:v", getattr(Config, "NVENC_BITRATE", "3M"),
-        "-g", str(getattr(Config, "NVENC_GOP_SIZE", 30)),
-        "-pix_fmt", "yuv420p",
-        "-r", str(Config.VIDEO_FPS),
-        str(output_path)
-    ]
+    """Create Ken Burns effect using optimized video utilities."""
+    from utils.video_utils import create_ken_burns_video, create_static_video
     
     try:
         print(f"  Creating Ken Burns effect: {Path(image_path).name}")
-        result = subprocess.run(cmd, text=True)
-        if result.returncode != 0:
-            print(f"Ken Burns FFmpeg failed with return code: {result.returncode}")
-            # Fallback: simple static image
-            return _create_static_video(image_path, duration, output_path)
-        return output_path
+        return create_ken_burns_video(image_path, duration, output_path)
     except Exception as e:
-        print(f"Ken Burns error: {e}")
-        # Fallback: simple static image
-        return _create_static_video(image_path, duration, output_path)
+        print(f"Ken Burns error: {e}, falling back to static video")
+        return create_static_video(image_path, duration, output_path)
 
 
 def _create_static_video(image_path: str, duration: float, output_path: str) -> str:
     """Create static video from image as fallback."""
-    
-    cmd = [
-        "ffmpeg", "-y",
-        "-loop", "1",
-        "-i", str(image_path),
-        "-t", str(duration),
-        "-vf", f"scale={Config.VIDEO_WIDTH}:{Config.VIDEO_HEIGHT}:force_original_aspect_ratio=decrease,"
-               f"pad={Config.VIDEO_WIDTH}:{Config.VIDEO_HEIGHT}:(ow-iw)/2:(oh-ih)/2",
-        "-c:v", Config.VIDEO_CODEC,
-        "-preset", getattr(Config, "NVENC_PRESET", "p1"),
-        "-tune", getattr(Config, "NVENC_TUNE", "ull"),
-        "-rc", getattr(Config, "NVENC_RC", "cbr"),
-        "-b:v", getattr(Config, "NVENC_BITRATE", "3M"),
-        "-g", str(getattr(Config, "NVENC_GOP_SIZE", 30)),
-        "-pix_fmt", "yuv420p",
-        "-r", str(Config.VIDEO_FPS),
-        str(output_path)
-    ]
+    from utils.video_utils import create_static_video as utils_create_static_video
     
     try:
         print(f"  Creating static video: {Path(image_path).name}")
-        subprocess.run(cmd, text=True)
-        return output_path
+        return utils_create_static_video(image_path, duration, output_path)
     except Exception as e:
         print(f"Static video creation error: {e}")
         raise
