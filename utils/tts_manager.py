@@ -9,6 +9,7 @@ import asyncio
 import logging
 import tempfile
 import threading
+import wave
 from pathlib import Path
 from typing import Optional, Dict, Any, Union
 import sys
@@ -33,8 +34,16 @@ except ImportError:
     gTTS = None
     AudioSegment = None
 
+try:
+    from piper import PiperVoice
+    PIPER_TTS_AVAILABLE = True
+except ImportError:
+    PIPER_TTS_AVAILABLE = False
+    PiperVoice = None
+
 from settings.config import Config
 from utils.performance_optimizer import performance_optimizer
+from utils.resource_manager import ManagedResource, get_resource_manager
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +53,7 @@ class TTSError(Exception):
     pass
 
 
-class TTSManager:
+class TTSManager(ManagedResource):
     """Simplified TTS manager with connection pooling and fallback support"""
     
     def __init__(self, preferred_engine: str = "edge", voice: Optional[str] = None):
@@ -62,11 +71,26 @@ class TTSManager:
         # Check availability
         self.edge_available = EDGE_TTS_AVAILABLE
         self.gtts_available = GTTS_AVAILABLE
+        self.piper_available = PIPER_TTS_AVAILABLE
         
-        if not (self.edge_available or self.gtts_available):
-            raise TTSError("No TTS engines available. Install edge-tts or gtts.")
+        if not (self.edge_available or self.gtts_available or self.piper_available):
+            raise TTSError("No TTS engines available. Install piper-tts, edge-tts, or gtts.")
+        
+        # Initialize as managed resource
+        super().__init__(f"tts_manager_{self.preferred_engine}_{self.voice}", self._cleanup_tts)
+        self.resource_manager = get_resource_manager()
         
         logger.info(f"TTS Manager initialized - Edge: {self.edge_available}, gTTS: {self.gtts_available}")
+    
+    def _cleanup_tts(self) -> None:
+        """Cleanup TTS resources."""
+        try:
+            # Cleanup any active connections or resources
+            if hasattr(self, '_edge_connection'):
+                self._edge_connection = None
+            logger.debug("Cleaned up TTS resources")
+        except Exception as e:
+            logger.warning(f"Error during TTS cleanup: {e}")
     
     def _clean_text(self, text: str) -> str:
         """Clean text for TTS processing"""
@@ -154,6 +178,46 @@ class TTSManager:
             logger.warning(f"Edge TTS failed: {e}")
             return False
     
+    def _generate_with_piper_tts(self, text: str, output_path: Path) -> bool:
+        """Generate speech using Piper TTS (high quality, local)"""
+        try:
+            if not self.piper_available:
+                logger.warning("Piper TTS not available, skipping")
+                return False
+            
+            # Get model paths from config
+            model_path = getattr(Config, 'PIPER_MODEL_PATH', None)
+            config_path = getattr(Config, 'PIPER_CONFIG_PATH', None)
+            use_cuda = getattr(Config, 'PIPER_USE_CUDA', False)
+            
+            if not model_path or not config_path:
+                logger.error("Piper TTS model paths not configured")
+                return False
+            
+            # Check if model files exist
+            if not Path(model_path).exists() or not Path(config_path).exists():
+                logger.error(f"Piper TTS model files not found: {model_path}, {config_path}")
+                return False
+            
+            # Load Piper voice model
+            logger.info("Loading Piper TTS model...")
+            voice = PiperVoice.load(model_path, config_path, use_cuda=use_cuda)
+            
+            # Clean text for TTS
+            cleaned_text = self._clean_text(text)
+            
+            # Generate audio directly to WAV file
+            logger.info(f"Generating speech with Piper TTS: {len(cleaned_text)} characters")
+            with wave.open(str(output_path), "wb") as wav_file:
+                voice.synthesize_wav(cleaned_text, wav_file)
+            
+            logger.info(f"Piper TTS generated audio: {output_path}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Piper TTS generation failed: {e}")
+            return False
+    
     def _generate_with_gtts(self, text: str, output_path: Path) -> bool:
         """Generate audio using gTTS"""
         if not self.gtts_available:
@@ -195,14 +259,26 @@ class TTSManager:
         logger.info(f"Generating TTS audio: {len(cleaned_text)} characters")
         logger.debug(f"Original text length: {len(text)}, Cleaned: {len(cleaned_text)}")
         
-        # Try preferred engine first
+        # Try engines in order of preference
         engines_to_try = []
-        if self.preferred_engine == "edge" and self.edge_available:
-            engines_to_try.extend([("edge", self._generate_with_edge_tts)])
-        if self.gtts_available:
+        
+        # Check TTS provider from config
+        tts_provider = getattr(Config, 'TTS_PROVIDER', 'piper').lower()
+        
+        if tts_provider == "piper" and self.piper_available:
+            engines_to_try.append(("piper", self._generate_with_piper_tts))
+        elif tts_provider == "edge" and self.edge_available:
+            engines_to_try.append(("edge", self._generate_with_edge_tts))
+        elif tts_provider == "gtts" and self.gtts_available:
             engines_to_try.append(("gtts", self._generate_with_gtts))
-        if self.preferred_engine == "gtts" and self.gtts_available:
-            engines_to_try.insert(0, ("gtts", self._generate_with_gtts))
+        
+        # Add fallbacks
+        if self.piper_available and tts_provider != "piper":
+            engines_to_try.append(("piper", self._generate_with_piper_tts))
+        if self.edge_available and tts_provider != "edge":
+            engines_to_try.append(("edge", self._generate_with_edge_tts))
+        if self.gtts_available and tts_provider != "gtts":
+            engines_to_try.append(("gtts", self._generate_with_gtts))
         
         if not engines_to_try:
             raise TTSError("No TTS engines available")

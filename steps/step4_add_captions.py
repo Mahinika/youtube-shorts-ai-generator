@@ -7,7 +7,7 @@ Optimized for mobile viewing without sound.
 
 import sys
 from pathlib import Path
-from typing import List, Dict
+from typing import List, Dict, Any
 
 # Captions now handled by FFmpeg in step5_combine_everything.py
 
@@ -17,7 +17,7 @@ sys.path.insert(0, str(project_root))
 from settings.config import Config
 
 
-def create_shorts_captions(word_timestamps: List[Dict]) -> str:
+def create_shorts_captions(word_timestamps: List[Dict[str, Any]]) -> str:
     """
     Generate an ASS (.ass) karaoke subtitle file from per-word timestamps.
 

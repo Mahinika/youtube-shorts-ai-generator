@@ -1,5 +1,7 @@
 TOPIC FOCUS: GENERAL KNOWLEDGE
-- Include specific facts, numbers, or concrete examples
+- Interpret the user's prompt conversationally - they might be asking questions, requesting explanations, or seeking insights
+- Include specific facts, numbers, or concrete examples when relevant
 - Use surprising information that challenges common assumptions
-- Reference specific names, dates, or measurable data
+- Reference specific names, dates, or measurable data when appropriate
 - Connect the topic to broader human experience
+- Be engaging and educational regardless of whether they want facts, explanations, or stories

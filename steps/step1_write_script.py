@@ -10,6 +10,7 @@ import re
 import sys
 import time
 from pathlib import Path
+from typing import Dict, List, Any, Optional, Union
 
 import requests
 
@@ -26,11 +27,19 @@ from utils import (
     performance_tracker
 )
 from utils.logging_utils import get_logger, log_step, log_ai_generation, get_structured_logger
+from utils.error_handler import (
+    error_handler, AIGenerationError, ValidationError, 
+    validate_duration, create_error_context, log_error_with_context
+)
+from utils.validation_utils import (
+    validate_string_input, validate_script_input, validate_youtube_shorts_content
+)
 
 # Initialize loggers
 logger = get_logger("script_generation")
 structured_logger = get_structured_logger("script_generation")
 from utils.ai_providers import generate_with_ai
+from utils.template_script_generator import generate_template_script
 
 
 def get_topic_specific_context(topic: str) -> str:
@@ -38,10 +47,11 @@ def get_topic_specific_context(topic: str) -> str:
     return prompt_manager.get_topic_context(topic)
 
 
+@error_handler("script_generation", reraise=True)
 @log_step("script_generation", "Generate YouTube Shorts script using AI")
 @log_ai_generation(Config.AI_PROVIDER, getattr(Config, f"{Config.AI_PROVIDER.upper()}_MODEL", ""))
 @monitor_performance
-def write_script_with_ollama(user_prompt: str) -> dict:
+def write_script_with_ollama(user_prompt: str) -> Dict[str, Any]:
     """
     Generate YouTube Shorts script using configured AI provider (Groq or Ollama).
 
@@ -51,18 +61,52 @@ def write_script_with_ollama(user_prompt: str) -> dict:
     Returns:
         Dictionary with: topic, title, description, script, search_keywords, scene_descriptions
     """
+    # Validate input
+    user_prompt = validate_string_input(
+        user_prompt, "user_prompt", min_length=3, max_length=500
+    )
+    
     structured_logger.set_context(prompt=user_prompt[:100], provider=Config.AI_PROVIDER)
     structured_logger.info("Starting script generation")
     performance_tracker.start_operation("script_generation")
 
-    system_instructions = prompt_manager.get_prompt("script_gen")
+    # Get the appropriate prompt based on generation mode
+    prompt_mode = getattr(Config, 'SCRIPT_GENERATION_MODE', 'auto')
+    prompt_name = prompt_manager.get_prompt_mode(prompt_mode)
+    system_instructions = prompt_manager.get_prompt(prompt_name)
 
     # Get topic-specific context
     topic_context = get_topic_specific_context(user_prompt)
     
-    user_message = f"""{topic_context}
+    # Create user message based on mode and content detection
+    user_prompt_lower = user_prompt.lower()
+    
+    # Detect if this is a story request
+    story_keywords = ["story", "tale", "adventure", "narrative", "about", "playing", "playing with", "kid", "boy", "girl", "child", "children"]
+    is_story_request = any(keyword in user_prompt_lower for keyword in story_keywords)
+    
+    # Also check for explicit educational requests
+    educational_keywords = ["facts", "explain", "how", "why", "educational", "learn", "teach", "information", "data", "statistics"]
+    is_educational_request = any(keyword in user_prompt_lower for keyword in educational_keywords)
+    
+    if prompt_mode == "story" or (prompt_mode == "auto" and is_story_request and not is_educational_request):
+        user_message = f"""{topic_context}
 
-Create a YouTube Short based on: "{user_prompt}"
+The user wants to create a YouTube Short story about: "{user_prompt}"
+
+Create pure storytelling content - focus on characters, emotions, and narrative flow. 
+DO NOT include any facts, statistics, research data, or educational content.
+DO NOT use phrases like "Did you know", "Research shows", or "Studies indicate".
+Just tell an engaging story with characters and emotions.
+
+Return ONLY valid JSON."""
+    else:
+        user_message = f"""{topic_context}
+
+The user wants to create a YouTube Short about: "{user_prompt}"
+
+This is like a chat prompt - interpret what they're asking for and create engaging content around that topic. 
+Whether they want facts, explanations, stories, or insights, make it interesting and educational.
 
 Return ONLY valid JSON."""
 
@@ -81,7 +125,8 @@ Return ONLY valid JSON."""
         except ValueError as e:
             logger.error(f"Failed to parse JSON response: {e}")
             logger.debug(f"Raw response: {generated_text[:500]}...")
-            return create_fallback_script(user_prompt)
+            logger.info("Falling back to template-based script generation")
+            return generate_template_script(user_prompt)
 
         # Inline validation and safe adjustments
         def _word_count_okay(text) -> bool:
@@ -99,7 +144,8 @@ Return ONLY valid JSON."""
             logger.warning("JSON response missing required keys")
             logger.debug(f"Required keys: {required_keys}")
             logger.debug(f"Actual keys in response: {list(content.keys()) if isinstance(content, dict) else 'Not a dict'}")
-            return create_fallback_script(user_prompt)
+            logger.info("Falling back to template-based script generation")
+            return generate_template_script(user_prompt)
 
         # Fill in missing optional fields with defaults
         if "search_keywords" not in content:
@@ -153,7 +199,10 @@ Return ONLY valid JSON."""
         script = script.strip()
         if not script or len(script) < 10:
             # If script is too short or empty, create a basic one
-            script = f"Did you know about {user_prompt}? Here are some amazing facts that will surprise you. The truth is more interesting than you think. Comment below what you think!"
+            if any(word in user_prompt.lower() for word in ['what', 'why', 'how', 'tell me', 'explain']):
+                script = f"Great question about {user_prompt}! Let me break this down for you. This is actually more fascinating than most people realize. There's so much to explore here. What aspect interests you most? Comment below!"
+            else:
+                script = f"Let's talk about {user_prompt}! This is actually more interesting than you might think. There are some surprising aspects to this topic that most people don't know about. Want to learn more? Comment below what you'd like to know!"
 
         content["script"] = script
 
@@ -184,9 +233,17 @@ Return ONLY valid JSON."""
         # For now, skip quality assessment to get basic generation working
         logger.info("Skipping judge/revision process for now - basic generation completed")
 
-        logger.info("Script generation completed successfully")
-        performance_tracker.end_operation("script_generation", success=True)
-        return content
+        # Validate generated content
+        try:
+            content = validate_script_input(content)
+            logger.info("Script generation completed successfully")
+            performance_tracker.end_operation("script_generation", success=True)
+            return content
+        except ValidationError as validation_error:
+            logger.warning(f"Generated content validation failed: {validation_error}")
+            # Return template-based content if validation fails
+            logger.info("Falling back to template-based script generation")
+            return generate_template_script(user_prompt)
 
     except Exception as e:
         logger.error(f"Script generation failed: {e}")
@@ -196,24 +253,31 @@ Return ONLY valid JSON."""
         if Config.AI_PROVIDER == "groq" and not Config.GROQ_API_KEY:
             logger.error("GROQ_API_KEY not set! Get one at https://console.groq.com")
             logger.error("Add it to your .env file: GROQ_API_KEY=your_key_here")
-        elif Config.AI_PROVIDER == "ollama":
-            logger.error(f"Make sure Ollama is running: ollama serve")
-            logger.error(f"Check: curl {Config.OLLAMA_HOST}")
+        elif Config.AI_PROVIDER == "grok" and not Config.GROK_API_KEY:
+            logger.error("GROK_API_KEY not set! Get one at https://console.x.ai")
+            logger.error("Add it to your .env file: GROK_API_KEY=your_key_here")
         
         performance_tracker.end_operation("script_generation", success=False)
-        return create_fallback_script(user_prompt)
+        logger.info("Falling back to template-based script generation")
+        return generate_template_script(user_prompt)
 
 
-def create_fallback_script(prompt: str) -> dict:
-    """Create a basic script if Ollama fails"""
+def create_fallback_script(prompt: str) -> Dict[str, Any]:
+    """Create a basic script if AI generation fails"""
 
     clean_prompt = prompt[:100] if prompt else "content"
+    
+    # Create more conversational fallback based on prompt type
+    if any(word in prompt.lower() for word in ['what', 'why', 'how', 'tell me', 'explain']):
+        script = f"Great question about {clean_prompt}! This is actually more fascinating than most people realize. There's so much to explore here. What aspect interests you most? Comment below!"
+    else:
+        script = f"Let's talk about {clean_prompt}! This is actually more interesting than you might think. There are some surprising aspects to this topic that most people don't know about. Want to learn more? Comment below what you'd like to know!"
 
     return {
         "topic": f"YouTube Short about {clean_prompt}",
         "title": f"{clean_prompt[:50]}",
         "description": f"A YouTube Short about {clean_prompt}\n\n{Config.AI_DISCLOSURE_TEXT}",
-        "script": f"Want to know about {clean_prompt}? Here's something cool you need to see. This is amazing and interesting. Follow for more awesome Shorts!",
+        "script": script,
         "search_keywords": (
             prompt.split()[:5]
             if prompt
@@ -248,7 +312,7 @@ def estimate_script_duration(script: str, words_per_second: float = 2.5) -> floa
 
 
 @monitor_performance
-def generate_word_timestamps(script: str, total_duration: float) -> list:
+def generate_word_timestamps(script: str, total_duration: float) -> List[Dict[str, Any]]:
     """
     Create timestamps for each word (for karaoke captions).
 
@@ -300,7 +364,7 @@ def generate_word_timestamps(script: str, total_duration: float) -> list:
 
 if __name__ == "__main__":
     # Test this module
-    test_prompt = "Amazing facts about the ocean"
+    test_prompt = "Tell me something fascinating about the ocean"
     logger.info(f"Running test with prompt: {test_prompt}")
 
     result = write_script_with_ollama(test_prompt)

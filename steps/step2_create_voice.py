@@ -8,6 +8,7 @@ Outputs to D drive temp folder.
 import sys
 from pathlib import Path
 import re
+from typing import Dict, Any, Optional, Union
 
 from gtts import gTTS
 from pydub import AudioSegment
@@ -22,6 +23,16 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 from settings.config import Config
+from utils.error_handler import (
+    error_handler, AIGenerationError, ValidationError, 
+    validate_duration, create_error_context, log_error_with_context
+)
+from utils.validation_utils import (
+    validate_string_input, validate_numeric_input, validate_audio_specs
+)
+from utils.logging_utils import get_logger
+
+logger = get_logger("voice_generation")
 
 
 def clean_narrative_text(text: str) -> str:
@@ -66,7 +77,8 @@ def clean_narrative_text(text: str) -> str:
     return text
 
 
-def create_voice_narration(script_text: str, voice_name: str | None = None) -> dict:
+@error_handler("voice_generation", reraise=True)
+def create_voice_narration(script_text: str, voice_name: Optional[str] = None) -> Dict[str, Any]:
     """
     Convert script text to voice audio using simplified TTS manager.
 
@@ -79,15 +91,39 @@ def create_voice_narration(script_text: str, voice_name: str | None = None) -> d
     """
     from utils.tts_manager import create_voice_narration as tts_create_voice
     
-    print("Creating voice narration...")
+    # Validate input
+    script_text = validate_string_input(
+        script_text, "script_text", min_length=1, max_length=2000
+    )
+    
+    logger.info("Creating voice narration...")
     
     try:
         result = tts_create_voice(script_text, voice_name)
-        print(f"Voice created: {result['duration']:.1f} seconds")
+        
+        # Validate result
+        if not result or 'duration' not in result:
+            raise AIGenerationError(
+                "TTS generation returned invalid result",
+                error_code="INVALID_TTS_RESULT",
+                details={"result": result}
+            )
+        
+        # Validate duration
+        duration = validate_duration(result['duration'], min_duration=1.0, max_duration=60.0)
+        result['duration'] = duration
+        
+        logger.info(f"Voice created: {duration:.1f} seconds")
         return result
+        
     except Exception as e:
-        print(f"ERROR creating voice: {e}")
-        raise
+        context = create_error_context("voice_generation", script_length=len(script_text), voice_name=voice_name)
+        log_error_with_context(logger, e, context)
+        raise AIGenerationError(
+            f"Voice generation failed: {e}",
+            error_code="VOICE_GENERATION_FAILED",
+            details={"script_length": len(script_text), "voice_name": voice_name}
+        )
 
 
 if __name__ == "__main__":

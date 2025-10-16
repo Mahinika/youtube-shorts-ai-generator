@@ -10,15 +10,28 @@ import json
 import subprocess
 from pathlib import Path
 from tempfile import NamedTemporaryFile
+from typing import List, Dict, Any, Optional, Union
 
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 from settings.config import Config
+from utils.error_handler import (
+    error_handler, VideoProcessingError, FileOperationError, ValidationError,
+    validate_file_path, validate_duration, create_error_context, log_error_with_context
+)
+from utils.validation_utils import (
+    validate_list_input, validate_numeric_input, validate_string_input,
+    validate_file_path_input, validate_video_specs
+)
+from utils.logging_utils import get_logger
+
+logger = get_logger("video_combination")
 
 
+@error_handler("video_combination", reraise=True)
 def combine_into_final_video(
-    video_clips: list,
+    video_clips: List[str],
     audio_path: str,
     audio_duration: float,
     caption_ass_path: str,
@@ -44,11 +57,30 @@ def combine_into_final_video(
     """
     from utils.video_utils import combine_video_with_audio
 
-    print("Combining into final YouTube Short using optimized video utilities...")
+    # Validate inputs
+    video_clips = validate_list_input(
+        video_clips, "video_clips", min_items=1, max_items=20, item_type=str
+    )
+    
+    audio_path = validate_file_path_input(
+        audio_path, "audio_path", must_exist=True, must_be_file=True,
+        allowed_extensions=['.mp3', '.wav', '.m4a', '.aac']
+    )
+    
+    # Validate duration
+    audio_duration = validate_numeric_input(
+        audio_duration, "audio_duration", min_value=1.0, max_value=60.0
+    )
+    
+    output_name = validate_string_input(
+        output_name, "output_name", min_length=1, max_length=100
+    )
+
+    logger.info("Combining into final YouTube Short using optimized video utilities...")
 
     # Ensure duration does not exceed 60 seconds
     if audio_duration > Config.MAX_DURATION_SECONDS:
-        print(f"WARNING: Trimming to {Config.MAX_DURATION_SECONDS} seconds")
+        logger.warning(f"Trimming to {Config.MAX_DURATION_SECONDS} seconds")
         audio_duration = Config.MAX_DURATION_SECONDS
 
     # Create output directory
@@ -90,7 +122,14 @@ def combine_into_final_video(
         raise
 
 
-def _build_ffmpeg_command(video_clips, audio_path, audio_duration, output_name, output_path, caption_ass_path: str = ""):
+def _build_ffmpeg_command(
+    video_clips: List[str], 
+    audio_path: str, 
+    audio_duration: float, 
+    output_name: str, 
+    output_path: str, 
+    caption_ass_path: str = ""
+) -> List[str]:
     """Build the complete FFmpeg command for video composition."""
     
     input_args = []
@@ -214,7 +253,7 @@ def _build_ffmpeg_command(video_clips, audio_path, audio_duration, output_name, 
     return cmd
 
 
-def _generate_captions(output_name, audio_duration):
+def _generate_captions(output_name: str, audio_duration: float) -> List[str]:
     """Generate caption data from script metadata."""
     try:
         from steps.step1_write_script import generate_word_timestamps

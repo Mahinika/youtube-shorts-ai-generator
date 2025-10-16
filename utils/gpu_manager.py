@@ -24,6 +24,8 @@ except ImportError:
     torch = None
 
 from settings.config import Config
+from utils.error_handler import ResourceError, ValidationError
+from utils.resource_manager import gpu_memory_context, GPUResource
 
 logger = logging.getLogger(__name__)
 
@@ -247,10 +249,10 @@ def get_gpu_info() -> Dict[str, Any]:
             "compute_capability": f"{props.major}.{props.minor}",
             "total_memory_gb": props.total_memory / (1024**3),
             "multiprocessor_count": props.multi_processor_count,
-            "max_threads_per_block": props.max_threads_per_block,
-            "max_threads_per_multiprocessor": props.max_threads_per_multiprocessor,
-            "memory_clock_rate": props.memory_clock_rate,
-            "memory_bus_width": props.memory_bus_width
+            "max_threads_per_block": getattr(props, 'max_threads_per_block', 1024),
+            "max_threads_per_multiprocessor": getattr(props, 'max_threads_per_multiprocessor', 2048),
+            "memory_clock_rate": getattr(props, 'memory_clock_rate', 0),
+            "memory_bus_width": getattr(props, 'memory_bus_width', 0)
         }
     except Exception as e:
         logger.error(f"Error getting GPU info: {e}")

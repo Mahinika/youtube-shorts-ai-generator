@@ -46,18 +46,45 @@ class PromptManager:
 
         template = Template(self._prompts_cache[prompt_name])
         return template.safe_substitute(**kwargs)
+    
+    def get_available_prompts(self) -> list:
+        """Get list of available prompt templates."""
+        prompt_files = list(self.prompts_dir.glob("*.txt"))
+        return [f.stem for f in prompt_files]
+    
+    def get_prompt_mode(self, mode: str = "auto") -> str:
+        """Get the appropriate prompt based on mode.
+        
+        Args:
+            mode: "auto", "story", "educational", or "mixed"
+            
+        Returns:
+            Prompt name to use
+        """
+        if mode == "story":
+            return "story_mode"
+        elif mode == "educational":
+            return "script_gen"  # Default educational mode
+        elif mode == "mixed":
+            return "script_gen"  # Mixed mode uses the updated script_gen
+        else:  # auto
+            return "script_gen"  # Auto-detection is built into the updated script_gen
 
     def get_topic_context(self, topic: str) -> str:
         """Get topic-specific context based on topic keywords.
 
         Args:
-            topic: Topic string to analyze
+            topic: Topic string to analyze (can be a question, statement, or request)
 
         Returns:
             Topic context string
         """
         topic_lower = topic.lower()
 
+        # Detect prompt type first
+        question_words = ['what', 'why', 'how', 'when', 'where', 'who', 'which', 'tell me', 'explain', 'share']
+        is_question = any(word in topic_lower for word in question_words)
+        
         # Priority-based topic detection (more specific first)
         topic_patterns = [
             # Entertainment/Gaming (highest priority for specific terms)
@@ -67,7 +94,7 @@ class PromptManager:
             ('science', ['scientific', 'research', 'experiment', 'discovery', 'theory', 'quantum', 'physics', 'chemistry', 'biology', 'astronomy', 'evolution']),
 
             # Technology (specific tech terms)
-            ('technology', ['software', 'hardware', 'programming', 'algorithm', 'machine learning', 'blockchain', 'cybersecurity', 'robotics']),
+            ('technology', ['software', 'hardware', 'programming', 'algorithm', 'machine learning', 'blockchain', 'cybersecurity', 'robotics', 'ai', 'artificial intelligence']),
 
             # Art (creative terms)
             ('art', ['painting', 'sculpture', 'photography', 'drawing', 'gallery', 'museum', 'artist', 'creative', 'design']),
@@ -76,7 +103,7 @@ class PromptManager:
             ('history', ['historical', 'ancient', 'civilization', 'empire', 'war', 'battle', 'revolution', 'century', 'era']),
 
             # Psychology (mental health terms)
-            ('psychology', ['psychological', 'cognitive', 'mental health', 'therapy', 'behavior', 'personality', 'emotion']),
+            ('psychology', ['psychological', 'cognitive', 'mental health', 'therapy', 'behavior', 'personality', 'emotion', 'brain', 'mind']),
 
             # Business (business terms)
             ('business', ['entrepreneur', 'startup', 'investment', 'profit', 'market', 'economy', 'finance', 'corporate']),
@@ -91,12 +118,19 @@ class PromptManager:
         for topic_file, keywords in topic_patterns:
             if any(keyword in topic_lower for keyword in keywords):
                 try:
-                    return self.get_prompt(f"topic_contexts/{topic_file}")
+                    base_context = self.get_prompt(f"topic_contexts/{topic_file}")
+                    # Add conversational context if it's a question
+                    if is_question:
+                        base_context += "\n\n- Treat this as a conversational question and provide engaging, educational responses"
+                    return base_context
                 except FileNotFoundError:
                     continue
 
-        # Default to general knowledge
-        return self.get_prompt("topic_contexts/general")
+        # Default to general knowledge with conversational context
+        general_context = self.get_prompt("topic_contexts/general")
+        if is_question:
+            general_context += "\n\n- Treat this as a conversational question and provide engaging, educational responses"
+        return general_context
 
     def clear_cache(self):
         """Clear the prompt cache to force reloading from disk."""

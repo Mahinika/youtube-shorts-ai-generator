@@ -59,16 +59,12 @@ def check_dependencies():
         sys.exit(1)
 
 
-def check_ollama():
-    """Check if Ollama is running"""
-    import requests
-
-    from settings.config import Config
-
+def check_template_system():
+    """Check if template system is available"""
     try:
-        response = requests.get(f"{Config.OLLAMA_HOST}/api/tags", timeout=2)
-        return response.status_code == 200
-    except:
+        from utils.template_script_generator import template_generator
+        return True
+    except ImportError:
         return False
 
 
@@ -130,13 +126,12 @@ def print_startup_info():
     # Check memory health
     memory_ok = check_memory_health()
 
-    # Check Ollama
-    if check_ollama():
-        print("  [OK] Ollama is running")
+    # Check Template System
+    if check_template_system():
+        print("  [OK] Template fallback system is available")
     else:
-        print("  [!] WARNING: Ollama is not running")
-        print("      Start Ollama with: ollama serve")
-        print("      Or the app will use fallback scripts")
+        print("  [!] WARNING: Template system not available")
+        print("      This may cause script generation to fail")
 
     # Check GPU
     if check_gpu():
@@ -190,7 +185,7 @@ if __name__ == "__main__":
         print(f"\n\nFATAL ERROR: {e}")
         print("\nPlease check:")
         print("  1. All dependencies are installed (pip install -r requirements.txt)")
-        print("  2. Ollama is running (ollama serve)")
+        print("  2. Template system is available (built-in)")
         print("  3. You're running from D:\\YouTubeShortsProject\\NCWM")
         input("\nPress Enter to exit...")
         sys.exit(1)

@@ -23,6 +23,7 @@ from ui.control_panels import (
     CaptionCreationPanel,
     FinalCompositionPanel
 )
+from ui.grok_config_panel import GrokConfigPanel
 
 # YouTube Studio color scheme
 YOUTUBE_DARK = "#282828"
@@ -271,6 +272,19 @@ class YouTubeStudioApp:
         )
         self.settings_btn.pack(fill="x", padx=10, pady=5)
 
+        # Grok Config button
+        self.grok_config_btn = ctk.CTkButton(
+            self.settings_frame,
+            text="🤖 Grok Config",
+            command=self.show_grok_config,
+            fg_color="transparent",
+            hover_color=YOUTUBE_RED_HOVER,
+            text_color=YOUTUBE_TEXT,
+            font=("Arial", 12),
+            anchor="w"
+        )
+        self.grok_config_btn.pack(fill="x", padx=10, pady=(0, 5))
+
         # About button
         self.about_btn = ctk.CTkButton(
             self.settings_frame,
@@ -401,6 +415,20 @@ class YouTubeStudioApp:
         )
         content.pack(expand=True, padx=20, pady=20)
 
+    def show_grok_config(self):
+        """Show Grok configuration dialog"""
+
+        grok_window = ctk.CTkToplevel(self.root)
+        grok_window.title("Grok AI Configuration")
+        grok_window.geometry("900x800")
+        grok_window.configure(fg_color=YOUTUBE_DARKER)
+        grok_window.transient(self.root)
+        grok_window.grab_set()
+
+        # Create Grok config panel
+        grok_panel = GrokConfigPanel(grok_window)
+        grok_panel.pack(fill="both", expand=True, padx=20, pady=20)
+
     def show_about(self):
         """Show about dialog"""
 
@@ -416,7 +444,7 @@ class YouTubeStudioApp:
                  "AI-powered video creation tool\n"
                  "Version 2.0\n\n"
                  "Built with:\n"
-                 "• Ollama (AI Scripts)\n"
+                 "• Grok AI (Script Generation)\n"
                  "• Stable Diffusion (AI Images)\n"
                  "• Edge TTS (Voice Synthesis)\n"
                  "• FFmpeg (Video Processing)\n\n"

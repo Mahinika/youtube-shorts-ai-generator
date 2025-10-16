@@ -227,11 +227,15 @@ class BaseControlPanel(ctk.CTkFrame):
         def thread_wrapper():
             try:
                 result = target_func(*args, **kwargs)
-                # Schedule UI update on main thread
-                self.root.after(0, lambda: self.handle_thread_result(result))
+                # Schedule UI update on main thread using a proper closure
+                def handle_result():
+                    self.handle_thread_result(result)
+                self.root.after(0, handle_result)
             except Exception as e:
-                # Schedule error handling on main thread
-                self.root.after(0, lambda: self.handle_thread_error(e))
+                # Schedule error handling on main thread using a proper closure
+                def handle_error(error=e):
+                    self.handle_thread_error(error)
+                self.root.after(0, handle_error)
         
         thread = threading.Thread(target=thread_wrapper, daemon=True)
         thread.start()
@@ -243,8 +247,13 @@ class BaseControlPanel(ctk.CTkFrame):
     def handle_thread_error(self, error):
         """Handle thread error - override in subclasses"""
         self.set_status(f"Error: {str(error)}", False)
-        self.update_output(f"Error during operation:\n{str(error)}")
+        self.update_output(f"Error during operation:\n{str(error)}\n\nTry again or check your settings.")
         self.run_button.configure(state="normal")
+        
+        # Log the error for debugging
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Thread error in {self.__class__.__name__}: {str(error)}")
 
 
 class ScriptGeneratorPanel(BaseControlPanel):
@@ -254,7 +263,7 @@ class ScriptGeneratorPanel(BaseControlPanel):
         return "Script Generator"
     
     def get_description(self) -> str:
-        return "Generate AI-powered YouTube Shorts scripts using Ollama"
+        return "Generate AI-powered YouTube Shorts scripts using Grok/Groq with template fallback"
     
     def create_controls(self):
         """Create script generation controls"""
@@ -267,7 +276,7 @@ class ScriptGeneratorPanel(BaseControlPanel):
         # Topic input
         self.topic_label = ctk.CTkLabel(
             self.controls_frame,
-            text="Video Topic:",
+            text="Chat with Grok - What should this video be about?",
             font=("Arial", 12, "bold"),
             text_color=YOUTUBE_TEXT
         )
@@ -279,7 +288,17 @@ class ScriptGeneratorPanel(BaseControlPanel):
             font=("Arial", 12)
         )
         self.topic_entry.pack(fill="x", padx=10, pady=(0, 10))
-        self.topic_entry.insert("1.0", "Amazing facts about space exploration")
+        self.topic_entry.insert("1.0", "Tell me something fascinating about space exploration")
+        
+        # Add help text below the textbox
+        self.help_label = ctk.CTkLabel(
+            self.controls_frame,
+            text="💡 Examples: 'Tell me about quantum physics', 'Explain how AI works', 'Share cool space facts', 'What's interesting about psychology?'",
+            font=("Arial", 10),
+            text_color=YOUTUBE_TEXT,
+            wraplength=600
+        )
+        self.help_label.pack(anchor="w", padx=10, pady=(0, 10))
         
         # AI Model selection
         self.model_frame = ctk.CTkFrame(self.controls_frame, fg_color=YOUTUBE_DARK)
@@ -302,7 +321,41 @@ class ScriptGeneratorPanel(BaseControlPanel):
             button_color=YOUTUBE_RED,
             button_hover_color=YOUTUBE_RED_HOVER
         )
-        self.model_dropdown.pack(fill="x", padx=10, pady=(0, 10))
+        self.model_dropdown.pack(fill="x", padx=10, pady=(0, 5))
+        
+        # Grok Status Indicator
+        self.grok_status_frame = ctk.CTkFrame(self.model_frame, fg_color="transparent")
+        self.grok_status_frame.pack(fill="x", padx=10, pady=(0, 10))
+        
+        self.grok_status_label = ctk.CTkLabel(
+            self.grok_status_frame,
+            text="Grok Status:",
+            font=("Arial", 10, "bold"),
+            text_color=YOUTUBE_TEXT_SECONDARY
+        )
+        self.grok_status_label.pack(side="left")
+        
+        self.grok_status_indicator = ctk.CTkLabel(
+            self.grok_status_frame,
+            text="Checking...",
+            font=("Arial", 10),
+            text_color=YOUTUBE_TEXT_SECONDARY
+        )
+        self.grok_status_indicator.pack(side="right")
+        
+        # Grok Config Button
+        self.grok_config_btn = ctk.CTkButton(
+            self.model_frame,
+            text="🤖 Configure Grok",
+            command=self.show_grok_config,
+            fg_color="transparent",
+            hover_color=YOUTUBE_RED_HOVER,
+            text_color=YOUTUBE_TEXT_SECONDARY,
+            font=("Arial", 10),
+            height=25,
+            width=120
+        )
+        self.grok_config_btn.pack(anchor="e", padx=10, pady=(0, 10))
         
         # AI Settings
         self.ai_settings_frame = ctk.CTkFrame(self.controls_frame, fg_color=YOUTUBE_DARK)
@@ -381,14 +434,19 @@ class ScriptGeneratorPanel(BaseControlPanel):
     
     def load_settings(self):
         """Load current settings into widgets"""
-        self.model_var.set(self.settings_manager.get_setting("OLLAMA_MODEL", "llama3.2"))
-        self.temp_var.set(self.settings_manager.get_setting("OLLAMA_TEMPERATURE", 0.7))
+        # Template-based fallback doesn't need model/temperature settings
+        self.model_var.set("Template-based")
+        self.temp_var.set(0.8)
         self.words_var.set(self.settings_manager.get_setting("SCRIPT_TARGET_WORDS", 110))
+        
+        # Update Grok status
+        self.update_grok_status()
     
     def collect_widget_values(self):
         """Collect widget values and save to settings manager"""
-        self.settings_manager.update_setting("OLLAMA_MODEL", self.model_var.get())
-        self.settings_manager.update_setting("OLLAMA_TEMPERATURE", self.temp_var.get())
+        # Template-based fallback doesn't need model/temperature settings
+        # self.settings_manager.update_setting("OLLAMA_MODEL", self.model_var.get())
+        # self.settings_manager.update_setting("OLLAMA_TEMPERATURE", self.temp_var.get())
         self.settings_manager.update_setting("SCRIPT_TARGET_WORDS", self.words_var.get())
     
     def run_step(self):
@@ -402,7 +460,7 @@ class ScriptGeneratorPanel(BaseControlPanel):
             return
         
         # Update UI to show we're starting
-        self.update_output("Generating script with Ollama AI...\n\nThis may take 30-60 seconds.\nPlease wait...")
+        self.update_output("Generating script with AI...\n\nThis may take 10-30 seconds.\nPlease wait...")
         
         # Run script generation in a separate thread
         self.run_in_thread(self._generate_script_thread, topic)
@@ -482,6 +540,40 @@ class ScriptGeneratorPanel(BaseControlPanel):
             self.update_output("Failed to generate script. Please check:\n• AI provider is configured\n• Topic is valid\n• Try again")
         
         self.run_button.configure(state="normal")
+    
+    def show_grok_config(self):
+        """Show Grok configuration dialog"""
+        if hasattr(self.app, 'show_grok_config'):
+            self.app.show_grok_config()
+        else:
+            messagebox.showinfo("Info", "Grok configuration panel not available")
+    
+    def update_grok_status(self):
+        """Update Grok status indicator"""
+        try:
+            from settings.config import Config
+            
+            if Config.AI_PROVIDER.lower() == "grok":
+                if Config.GROK_API_KEY and len(Config.GROK_API_KEY.strip()) > 0:
+                    self.grok_status_indicator.configure(
+                        text="✓ Grok Ready",
+                        text_color="#00FF00"
+                    )
+                else:
+                    self.grok_status_indicator.configure(
+                        text="⚠ API Key Missing",
+                        text_color="#FFFF00"
+                    )
+            else:
+                self.grok_status_indicator.configure(
+                    text=f"→ {Config.AI_PROVIDER.upper()}",
+                    text_color="#AAAAAA"
+                )
+        except Exception as e:
+            self.grok_status_indicator.configure(
+                text="❌ Error",
+                text_color="#FF0000"
+            )
 
 
 class VoiceSynthesisPanel(BaseControlPanel):
@@ -491,7 +583,7 @@ class VoiceSynthesisPanel(BaseControlPanel):
         return "Voice Synthesis"
     
     def get_description(self) -> str:
-        return "Generate high-quality voice narration using Edge TTS or gTTS"
+        return "Generate high-quality voice narration using Piper TTS, Edge TTS, or gTTS"
     
     def create_controls(self):
         """Create voice synthesis controls"""
@@ -516,14 +608,43 @@ class VoiceSynthesisPanel(BaseControlPanel):
         self.engine_var = ctk.StringVar()
         self.engine_dropdown = ctk.CTkOptionMenu(
             self.engine_frame,
-            values=["edge", "gtts"],
+            values=["piper", "edge", "gtts"],
             variable=self.engine_var,
             fg_color=YOUTUBE_LIGHT,
             button_color=YOUTUBE_RED,
-            button_hover_color=YOUTUBE_RED_HOVER
+            button_hover_color=YOUTUBE_RED_HOVER,
+            command=self.on_engine_changed
         )
         self.engine_dropdown.pack(fill="x", padx=10, pady=(0, 10))
         
+        # Piper TTS Configuration
+        self.piper_frame = ctk.CTkFrame(self.controls_frame, fg_color=YOUTUBE_DARK)
+        self.piper_frame.pack(fill="x", padx=10, pady=5)
+        
+        self.piper_label = ctk.CTkLabel(
+            self.piper_frame,
+            text="Piper TTS Configuration:",
+            font=("Arial", 12, "bold"),
+            text_color=YOUTUBE_TEXT
+        )
+        self.piper_label.pack(anchor="w", padx=10, pady=(10, 5))
+        
+        self.piper_model_label = ctk.CTkLabel(
+            self.piper_frame,
+            text="Model: en-us-amy-medium (Natural Female Voice)",
+            font=("Arial", 10),
+            text_color=YOUTUBE_TEXT_SECONDARY
+        )
+        self.piper_model_label.pack(anchor="w", padx=10, pady=(0, 5))
+        
+        self.piper_status_label = ctk.CTkLabel(
+            self.piper_frame,
+            text="Status: Checking...",
+            font=("Arial", 10),
+            text_color=YOUTUBE_TEXT_SECONDARY
+        )
+        self.piper_status_label.pack(anchor="w", padx=10, pady=(0, 10))
+
         # Voice selection (for Edge TTS)
         self.voice_frame = ctk.CTkFrame(self.controls_frame, fg_color=YOUTUBE_DARK)
         self.voice_frame.pack(fill="x", padx=10, pady=5)
@@ -548,18 +669,21 @@ class VoiceSynthesisPanel(BaseControlPanel):
         )
         self.voice_dropdown.pack(fill="x", padx=10, pady=(0, 10))
         
-        # Language setting
+        # Language selection (for gTTS)
+        self.language_frame = ctk.CTkFrame(self.controls_frame, fg_color=YOUTUBE_DARK)
+        self.language_frame.pack(fill="x", padx=10, pady=5)
+        
         self.language_label = ctk.CTkLabel(
-            self.voice_frame,
-            text="Language:",
-            font=("Arial", 11),
+            self.language_frame,
+            text="Language (gTTS):",
+            font=("Arial", 12, "bold"),
             text_color=YOUTUBE_TEXT
         )
-        self.language_label.pack(anchor="w", padx=10, pady=(5, 0))
+        self.language_label.pack(anchor="w", padx=10, pady=(10, 5))
         
         self.language_var = ctk.StringVar()
         self.language_entry = ctk.CTkEntry(
-            self.voice_frame,
+            self.language_frame,
             textvariable=self.language_var,
             width=100
         )
@@ -588,15 +712,63 @@ class VoiceSynthesisPanel(BaseControlPanel):
     
     def load_settings(self):
         """Load current settings into widgets"""
-        self.engine_var.set(self.settings_manager.get_setting("TTS_ENGINE", "edge"))
+        # Load TTS provider from config
+        tts_provider = getattr(Config, 'TTS_PROVIDER', 'piper')
+        self.engine_var.set(tts_provider)
+        
         self.voice_var.set(self.settings_manager.get_setting("EDGE_TTS_VOICE", "en-US-AriaNeural"))
         self.language_var.set(self.settings_manager.get_setting("VOICE_LANGUAGE", "en"))
+        
+        # Update UI based on current engine
+        self.on_engine_changed(tts_provider)
+        self.update_piper_status()
     
     def collect_widget_values(self):
         """Collect widget values and save to settings manager"""
         self.settings_manager.update_setting("TTS_ENGINE", self.engine_var.get())
         self.settings_manager.update_setting("EDGE_TTS_VOICE", self.voice_var.get())
         self.settings_manager.update_setting("VOICE_LANGUAGE", self.language_var.get())
+        
+        # Update TTS provider in config
+        Config.TTS_PROVIDER = self.engine_var.get()
+    
+    def on_engine_changed(self, selected_engine):
+        """Handle TTS engine selection change"""
+        if selected_engine == "piper":
+            self.piper_frame.pack(fill="x", padx=10, pady=5)
+            self.voice_frame.pack_forget()  # Hide Edge TTS voice selection
+            self.language_frame.pack_forget()  # Hide language selection
+        elif selected_engine == "edge":
+            self.piper_frame.pack_forget()  # Hide Piper config
+            self.voice_frame.pack(fill="x", padx=10, pady=5)  # Show Edge TTS
+            self.language_frame.pack_forget()  # Hide language selection
+        elif selected_engine == "gtts":
+            self.piper_frame.pack_forget()  # Hide Piper config
+            self.voice_frame.pack_forget()  # Hide Edge TTS
+            self.language_frame.pack(fill="x", padx=10, pady=5)  # Show language selection
+    
+    def update_piper_status(self):
+        """Update Piper TTS status indicator"""
+        try:
+            from pathlib import Path
+            model_path = getattr(Config, 'PIPER_MODEL_PATH', None)
+            config_path = getattr(Config, 'PIPER_CONFIG_PATH', None)
+            
+            if model_path and config_path and Path(model_path).exists() and Path(config_path).exists():
+                self.piper_status_label.configure(
+                    text="Status: Ready (High Quality Neural Voice)",
+                    text_color="#00FF00"
+                )
+            else:
+                self.piper_status_label.configure(
+                    text="Status: Model files not found",
+                    text_color="#FF0000"
+                )
+        except Exception as e:
+            self.piper_status_label.configure(
+                text=f"Status: Error - {str(e)[:30]}...",
+                text_color="#FF0000"
+            )
     
     def run_step(self):
         """Run voice synthesis"""
@@ -868,20 +1040,33 @@ class BackgroundGeneratorPanel(BaseControlPanel):
         self.run_in_thread(self._generate_backgrounds_thread, scene_descriptions)
     
     def _generate_backgrounds_thread(self, scene_descriptions):
-        """Generate backgrounds in a separate thread"""
+        """Generate backgrounds in a separate thread with AI enhancements"""
         try:
             # Import step functions
-            from steps.step3_generate_backgrounds import generate_ai_backgrounds, images_to_video_clips
+            from steps.step3_generate_backgrounds import generate_ai_backgrounds_enhanced, images_to_video_clips
             
-            # Run background generation
-            image_paths = generate_ai_backgrounds(scene_descriptions, duration_per_scene=10.0)
+            # Get full script data for AI enhancements
+            script_data = None
+            if hasattr(self.app, 'panels') and hasattr(self.app.panels, 'get'):
+                script_panel = self.app.panels.get('script')
+                if script_panel and hasattr(script_panel, 'script_data'):
+                    script_data = script_panel.script_data
+                    print("🤖 AI Enhancement: Using full script context for intelligent generation")
+            
+            # Run enhanced background generation
+            image_paths = generate_ai_backgrounds_enhanced(
+                scene_descriptions, 
+                script_data=script_data,
+                duration_per_scene=10.0
+            )
             
             if image_paths:
                 # Convert images to video clips
                 video_clips = images_to_video_clips(image_paths, duration_per_image=10.0)
                 return {
                     'images': image_paths,
-                    'video_clips': video_clips
+                    'video_clips': video_clips,
+                    'ai_enhanced': True
                 }
             else:
                 return None
@@ -901,7 +1086,15 @@ class BackgroundGeneratorPanel(BaseControlPanel):
             for i, path in enumerate(background_data['video_clips'], 1):
                 output_text += f"  {i}. {Path(path).name}\n"
             output_text += f"\nMethod: {self.settings_manager.get_setting('SD_METHOD', 'webui')}\n"
-            output_text += f"Quality: {self.settings_manager.get_setting('CURRENT_QUALITY_PRESET', 'balanced')}"
+            output_text += f"Quality: {self.settings_manager.get_setting('CURRENT_QUALITY_PRESET', 'balanced')}\n"
+            
+            # Show AI enhancement status
+            if background_data.get('ai_enhanced', False):
+                output_text += f"\n🤖 AI Enhancements:\n"
+                output_text += f"  ✓ Prompt Optimization: Enabled\n"
+                output_text += f"  ✓ ControlNet Guidance: Enabled\n"
+                output_text += f"  ✓ Quality Analysis: Enabled\n"
+                output_text += f"  ✓ Context-Aware Generation: Enabled"
             
             self.update_output(output_text)
             self.set_status("Completed", False, True)

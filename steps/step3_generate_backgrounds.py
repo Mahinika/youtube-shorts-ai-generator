@@ -9,6 +9,7 @@ import os
 import sys
 import time
 from pathlib import Path
+from typing import Optional, Dict, List, Any
 
 import torch
 
@@ -41,9 +42,21 @@ except ImportError:
 # Set CUDA memory management for RTX 2060 (6GB)
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
-# Import GPU manager and performance optimizer
+# Import unified SD generation manager
+from utils.sd_generation_manager import generate_ai_backgrounds_unified, create_sd_manager
 from utils.gpu_manager import get_gpu_manager, gpu_memory_context, check_gpu_compatibility
 from utils.performance_optimizer import performance_optimizer, optimize_stable_diffusion_settings
+from utils.error_handler import (
+    error_handler, AIGenerationError, ResourceError, ValidationError,
+    validate_image_dimensions, create_error_context, log_error_with_context
+)
+from utils.validation_utils import (
+    validate_list_input, validate_numeric_input, validate_string_input,
+    validate_video_specs
+)
+from utils.logging_utils import get_logger
+
+logger = get_logger("background_generation")
 
 
 def check_gpu_available() -> bool:
@@ -53,10 +66,10 @@ def check_gpu_available() -> bool:
 
 
 def generate_ai_backgrounds_webui_enhanced(
-    scene_descriptions: list, 
-    script_data: Optional[Dict] = None,
+    scene_descriptions: List[str], 
+    script_data: Optional[Dict[str, Any]] = None,
     duration_per_scene: float = 3.0
-) -> list:
+) -> List[str]:
     """
     Generate AI images using AUTOMATIC1111 WebUI API with AI enhancements.
     
@@ -233,8 +246,8 @@ def generate_ai_backgrounds_webui_enhanced(
 
 
 def generate_ai_backgrounds_webui(
-    scene_descriptions: list, duration_per_scene: float = 3.0
-) -> list:
+    scene_descriptions: List[str], duration_per_scene: float = 3.0
+) -> List[str]:
     """
     Generate AI images using AUTOMATIC1111 WebUI API.
     This is faster and has more features than the diffusers method.
@@ -318,10 +331,10 @@ def generate_ai_backgrounds_webui(
 
 
 def generate_ai_backgrounds_diffusers_enhanced(
-    scene_descriptions: list, 
-    script_data: Optional[Dict] = None,
+    scene_descriptions: List[str], 
+    script_data: Optional[Dict[str, Any]] = None,
     duration_per_scene: float = 3.0
-) -> list:
+) -> List[str]:
     """
     Generate AI images using the diffusers library with AI enhancements (fallback method).
 
@@ -625,8 +638,8 @@ def generate_ai_backgrounds_diffusers_enhanced(
 
 
 def generate_ai_backgrounds_diffusers(
-    scene_descriptions: list, duration_per_scene: float = 3.0
-) -> list:
+    scene_descriptions: List[str], duration_per_scene: float = 3.0
+) -> List[str]:
     """
     Generate AI images using the diffusers library (fallback method).
 
@@ -846,10 +859,10 @@ def generate_ai_backgrounds_diffusers(
 
 
 def generate_ai_backgrounds_enhanced(
-    scene_descriptions: list, 
-    script_data: Optional[Dict] = None,
+    scene_descriptions: List[str], 
+    script_data: Optional[Dict[str, Any]] = None,
     duration_per_scene: float = 3.0
-) -> list:
+) -> List[str]:
     """
     Generate AI images with AI enhancements (prompt optimization, ControlNet, quality analysis).
     
@@ -875,19 +888,15 @@ def generate_ai_backgrounds_enhanced(
         return generate_ai_backgrounds_diffusers_enhanced(scene_descriptions, script_data, duration_per_scene)
 
 
-@performance_optimizer.cached_function(
-    cache_key_func=lambda scene_descriptions, duration_per_scene: 
-        f"ai_backgrounds:{hash(tuple(scene_descriptions))}:{duration_per_scene}",
-    use_disk=True,
-    ttl=7200  # 2 hour cache
-)
+@error_handler("background_generation", reraise=True)
 def generate_ai_backgrounds(
-    scene_descriptions: list, duration_per_scene: float = 3.0
-) -> list:
+    scene_descriptions: List[str], duration_per_scene: float = 3.0
+) -> List[str]:
     """
-    Generate AI images for each scene using Stable Diffusion (legacy method).
+    Generate AI images for each scene using Stable Diffusion.
     
-    Automatically chooses between WebUI API or diffusers based on config.
+    Uses the unified generation system that automatically chooses the best method
+    and eliminates code duplication between WebUI and diffusers approaches.
 
     Args:
         scene_descriptions: List of text descriptions for each scene
@@ -897,18 +906,85 @@ def generate_ai_backgrounds(
         List of paths to generated images
     """
     
-    # Choose method based on config
-    method = getattr(Config, 'SD_METHOD', 'diffusers').lower()
+    # Validate inputs
+    scene_descriptions = validate_list_input(
+        scene_descriptions, "scene_descriptions", min_items=1, max_items=10, item_type=str
+    )
     
-    if method == 'webui':
-        print("Using AUTOMATIC1111 WebUI API method")
-        return generate_ai_backgrounds_webui(scene_descriptions, duration_per_scene)
-    else:
-        print("Using diffusers library method")
-        return generate_ai_backgrounds_diffusers(scene_descriptions, duration_per_scene)
+    duration_per_scene = validate_numeric_input(
+        duration_per_scene, "duration_per_scene", min_value=0.1, max_value=60.0
+    )
+    
+    # Check GPU availability
+    if not check_gpu_available():
+        raise ResourceError(
+            "GPU not available for Stable Diffusion generation",
+            error_code="GPU_NOT_AVAILABLE",
+            details={"gpu_required": True}
+        )
+    
+    logger.info(f"Generating {len(scene_descriptions)} AI backgrounds...")
+    
+    # Use unified generation system
+    method = getattr(Config, 'SD_METHOD', 'auto').lower()
+    use_enhancements = getattr(Config, 'SD_USE_AI_ENHANCEMENTS', True)
+    
+    try:
+        return generate_ai_backgrounds_unified(
+            scene_descriptions=scene_descriptions,
+            script_data=None,  # Legacy compatibility
+            duration_per_scene=duration_per_scene,
+            method=method,
+            use_enhancements=use_enhancements
+        )
+    except Exception as e:
+        context = create_error_context(
+            "background_generation", 
+            scene_count=len(scene_descriptions),
+            method=method,
+            use_enhancements=use_enhancements
+        )
+        log_error_with_context(logger, e, context)
+        raise AIGenerationError(
+            f"Background generation failed: {e}",
+            error_code="BACKGROUND_GENERATION_FAILED",
+            details={"scene_count": len(scene_descriptions), "method": method}
+        )
 
 
-def images_to_video_clips(image_paths: list, duration_per_image: float = 3.0):
+def generate_ai_backgrounds_enhanced(
+    scene_descriptions: List[str], 
+    script_data: Optional[Dict[str, Any]] = None,
+    duration_per_scene: float = 3.0
+) -> List[str]:
+    """
+    Generate AI images with AI enhancements (prompt optimization, ControlNet, quality analysis).
+    
+    Uses the unified generation system with full AI enhancement support.
+
+    Args:
+        scene_descriptions: List of text descriptions for each scene
+        script_data: Full script context from UI (title, script, topic, etc.)
+        duration_per_scene: How long each scene should display
+
+    Returns:
+        List of paths to generated images
+    """
+    
+    # Use unified generation system with enhancements
+    method = getattr(Config, 'SD_METHOD', 'auto').lower()
+    use_enhancements = True  # Force enhancements for this function
+    
+    return generate_ai_backgrounds_unified(
+        scene_descriptions=scene_descriptions,
+        script_data=script_data,
+        duration_per_scene=duration_per_scene,
+        method=method,
+        use_enhancements=use_enhancements
+    )
+
+
+def images_to_video_clips(image_paths: List[str], duration_per_image: float = 3.0) -> List[str]:
     """
     Convert static AI images to video clips with Ken Burns effect using FFmpeg.
     

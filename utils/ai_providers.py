@@ -193,23 +193,15 @@ def generate_with_ai(system_prompt: str, user_prompt: str, logger=None) -> str:
     if provider == "grok":
         providers = [
             ("Grok (xAI)", GrokProvider),
-            ("Groq (fallback)", GroqProvider),
-            ("Ollama (fallback)", OllamaProvider)
+            ("Groq (fallback)", GroqProvider)
         ]
     elif provider == "groq":
         providers = [
             ("Groq", GroqProvider),
-            ("Grok (fallback)", GrokProvider),
-            ("Ollama (fallback)", OllamaProvider)
-        ]
-    elif provider == "ollama":
-        providers = [
-            ("Ollama", OllamaProvider),
-            ("Grok (fallback)", GrokProvider),
-            ("Groq (fallback)", GroqProvider)
+            ("Grok (fallback)", GrokProvider)
         ]
     else:
-        raise AIProviderError(f"Unknown AI provider: {provider}. Use 'grok', 'groq', or 'ollama'")
+        raise AIProviderError(f"Unknown AI provider: {provider}. Use 'grok' or 'groq'")
     
     # Try each provider in order
     last_error = None
